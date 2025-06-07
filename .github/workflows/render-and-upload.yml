@@ -1,0 +1,48 @@
+name: Render and Upload Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      post_id:
+        description: 'The Reddit Post ID, used as the filename.'
+        required: true
+      render_payload:
+        description: 'The JSON data for the renderer script.'
+        required: true
+
+jobs:
+  render-and-upload:
+    runs-on: ubuntu-latest
+    # No 'permissions' block needed anymore! We are not writing to the repo.
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Caching is still a great idea to speed up dependency installation
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-python-3.11-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-python-3.11-pip-
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Render and Upload to ImageKit
+        env:
+          # Pass secrets securely to the environment
+          IMAGEKIT_PRIVATE_KEY: ${{ secrets.IMAGEKIT_PRIVATE_KEY }}
+          IMAGEKIT_PUBLIC_KEY: ${{ secrets.IMAGEKIT_PUBLIC_KEY }}
+          IMAGEKIT_URL_ENDPOINT: ${{ secrets.IMAGEKIT_URL_ENDPOINT }}
+          RENDERER_PAYLOAD: ${{ github.event.inputs.render_payload }}
+        run: |
+          # We now pass the post_id as an argument to the python script
+          python renderer.py render_and_upload ${{ github.event.inputs.post_id }}
