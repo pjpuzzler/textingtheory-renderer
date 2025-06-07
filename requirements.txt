@@ -1,0 +1,4 @@
+requests
+Pillow
+pilmoji
+emoji==1.6.3
