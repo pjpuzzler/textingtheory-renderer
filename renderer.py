@@ -330,16 +330,11 @@ def main():
                 )
                 continue
 
-        # Ensure color data and background hex are present
-        color_data_left = payload.get("color_data_left")
-        color_data_right = payload.get("color_data_right")
-        background_hex = payload.get("background_hex")
-
-        if not all([color_data_left, color_data_right, background_hex]):
-            print(
-                "Error: Missing color_data_left, color_data_right, or background_hex in payload."
-            )
-            sys.exit(1)
+        # Extract color data from the standard Analysis format
+        color_block = payload.get("color", {})
+        color_data_left = color_block.get("left")
+        color_data_right = color_block.get("right")
+        background_hex = color_block.get("background_hex")
 
         render_conversation(
             parsed_messages,
@@ -369,12 +364,12 @@ def main():
             sys.exit(1)
 
         # Prepare minimized analysis for post body (strip message content, keep standard Analysis format)
-        minimized_analysis = dict(payload)
-        if "messages" in minimized_analysis:
-            minimized_analysis["messages"] = [
-                {**msg, "content": ""} for msg in minimized_analysis["messages"]
-            ]
-        minimized_json = json.dumps(minimized_analysis, separators=(",", ":"))
+        # comment_analysis = dict(payload)
+        # if "messages" in comment_analysis:
+        #     comment_analysis["messages"] = [
+        #         {**msg, "content": ""} for msg in comment_analysis["messages"]
+        #     ]
+        comment_json = json.dumps(payload, separators=(",", ":"))
 
         try:
             subreddit = reddit.subreddit(target_subreddit_name)
@@ -391,7 +386,7 @@ def main():
                 f"Successfully posted intermediate image to Reddit: {submission.shortlink} (ID: {submission.id})"
             )
             # Post minimized analysis as a comment
-            submission.reply(minimized_json)
+            submission.reply(comment_json)
             print(
                 "Posted minimized analysis as a comment on the intermediate image post."
             )
