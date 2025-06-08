@@ -368,6 +368,13 @@ def main():
                 os.remove(local_output_path)
             sys.exit(1)
 
+        # Prepare minimized analysis for post body (strip message content)
+        minimized_analysis = dict(payload)
+        minimized_analysis["messages"] = [
+            {**msg, "content": ""} for msg in payload.get("messages", [])
+        ]
+        minimized_json = json.dumps(minimized_analysis, separators=(",", ":"))
+
         try:
             subreddit = reddit.subreddit(target_subreddit_name)
             print(
@@ -378,6 +385,7 @@ def main():
                 image_path=local_output_path,
                 nsfw=False,
                 spoiler=False,
+                selftext=minimized_json,
             )
             print(
                 f"Successfully posted intermediate image to Reddit: {submission.shortlink} (ID: {submission.id})"
