@@ -368,11 +368,12 @@ def main():
                 os.remove(local_output_path)
             sys.exit(1)
 
-        # Prepare minimized analysis for post body (strip message content)
+        # Prepare minimized analysis for post body (strip message content, keep standard Analysis format)
         minimized_analysis = dict(payload)
-        minimized_analysis["messages"] = [
-            {**msg, "content": ""} for msg in payload.get("messages", [])
-        ]
+        if "messages" in minimized_analysis:
+            minimized_analysis["messages"] = [
+                {**msg, "content": ""} for msg in minimized_analysis["messages"]
+            ]
         minimized_json = json.dumps(minimized_analysis, separators=(",", ":"))
 
         try:
