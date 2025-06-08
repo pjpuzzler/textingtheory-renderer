@@ -2,7 +2,7 @@
 
 Last updated: [Date]
 
-Please read these Terms of Service ("Terms") carefully before using the TextingTheory Bot ("Bot", "Service") operated by [Your Name/Reddit Username] ("us", "we", or "our").
+Please read these Terms of Service ("Terms") carefully before using the TextingTheory Bot ("Bot", "Service") operated by u/pjpuzzler ("us", "we", or "our").
 
 Your access to and use of the Service is conditioned on your acceptance of and compliance with these Terms. These Terms apply to all users who interact with the Service.
 
