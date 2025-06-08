@@ -385,10 +385,14 @@ def main():
                 image_path=local_output_path,
                 nsfw=False,
                 spoiler=False,
-                selftext=minimized_json,
             )
             print(
                 f"Successfully posted intermediate image to Reddit: {submission.shortlink} (ID: {submission.id})"
+            )
+            # Post minimized analysis as a comment
+            submission.reply(minimized_json)
+            print(
+                "Posted minimized analysis as a comment on the intermediate image post."
             )
         except Exception as e:
             print(f"An error occurred during Reddit submission: {e}")
