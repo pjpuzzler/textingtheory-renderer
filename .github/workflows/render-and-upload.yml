@@ -37,16 +37,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt # Ensure requirements.txt includes praw, Pillow, pilmoji
 
-      - name: Write render_payload to file
-        run: echo '${{ github.event.inputs.render_payload }}' > render_payload.json
-        shell: bash
+      # The "Write render_payload to file" step is REMOVED
 
       - name: Render image and Post to Reddit as Intermediate
         env:
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
-          REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }} # e.g., "TextingTheoryRendererGHA/0.1 by u/YourBotName"
+          REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
           REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
           REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
+          RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }} # Pass payload as env var
         run: |
-          python renderer.py render_and_post_intermediate ${{ github.event.inputs.post_id }} render_payload.json ${{ github.event.inputs.target_subreddit }}
+          # The payload_filepath argument is removed from the script call
+          python renderer.py render_and_post_intermediate ${{ github.event.inputs.post_id }} ${{ github.event.inputs.target_subreddit }}

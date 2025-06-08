@@ -24,9 +24,7 @@ class Classification(enum.Enum):
     GREAT = "great"
     INACCURACY = "inaccuracy"
     INTERESTING = "interesting"
-    MEGABLUNDER = (
-        "megablunder"  # ensure your system_prompt.js and analysis.ts handle this
-    )
+    MEGABLUNDER = "megablunder"
     MISS = "miss"
     MISTAKE = "mistake"
     RESIGN = "resign"
@@ -34,13 +32,8 @@ class Classification(enum.Enum):
     WINNER = "winner"
 
     def png_path(self, color: str) -> str:
-        # Ensure these badge paths are correct relative to where renderer.py is run in GHA
-        base_path = os.path.join(
-            os.path.dirname(__file__), "badges"
-        )  # Assuming badges folder is in the same directory
-        if not os.path.exists(
-            base_path
-        ):  # Fallback if script is run from a different CWD
+        base_path = os.path.join(os.path.dirname(__file__), "badges")
+        if not os.path.exists(base_path):
             base_path = "badges"
 
         match self:
@@ -54,10 +47,10 @@ class Classification(enum.Enum):
 class TextMessage:
     side: str
     content: str
-    classification: Classification  # This will be an enum member
+    classification: Classification
     unsent: bool = False
-    username: str = None  # Not used in current rendering but kept for structure
-    avatar_url: str = None  # Not used
+    username: str = None
+    avatar_url: str = None
 
 
 def wrap_text(text, draw, font, max_width):
@@ -141,15 +134,12 @@ def render_conversation(
     total_h += pad
 
     bg_rgba = ImageColor.getcolor(background_hex, "RGBA")
-
     img_bg = Image.new("RGBA", (img_w, total_h), bg_rgba)
-
     bubble_layer = Image.new("RGBA", (img_w, total_h), (0, 0, 0, 0))
-
     text_drawings = []
-
     y = pad
     text_offset = int(0 * scale)
+
     for i, (m, txt, (w, h)) in enumerate(zip(messages, wrapped, dims)):
         bw = w + 2 * pad
         bh = h + 2 * pad
@@ -165,9 +155,10 @@ def render_conversation(
             text_hex = color_data_right["text_hex"]
 
         x1, y1 = x0 + bw, y + bh
-
         bubble_draw = ImageDraw.Draw(bubble_layer)
+
         if m.unsent:
+            # ... (unsent bubble drawing logic - assuming it's correct) ...
             if m.side == "left":
                 center_big = (x0 + 5 * scale, y1 - 5 * scale)
                 big_rad = 7 * scale
@@ -236,13 +227,17 @@ def render_conversation(
             )
         )
 
-        badge = Image.open(
-            m.classification.png_path("white" if m.side == "right" else "black")
-        ).resize((badge_sz, badge_sz))
-        if badge.mode != "RGBA":
-            badge = badge.convert("RGBA")
-        by = y + (bh - badge_sz) // 2
-        img_bg.paste(badge, (badge_x, by), badge)
+        badge_path = m.classification.png_path(
+            "white" if m.side == "right" else "black"
+        )
+        try:
+            badge = Image.open(badge_path).resize((badge_sz, badge_sz))
+            if badge.mode != "RGBA":
+                badge = badge.convert("RGBA")
+            by = y + (bh - badge_sz) // 2
+            img_bg.paste(badge, (badge_x, by), badge)
+        except FileNotFoundError:
+            print(f"Warning: Badge file not found at {badge_path}. Skipping badge.")
 
         spacing = (
             pad // 5
@@ -252,7 +247,6 @@ def render_conversation(
         y += bh + spacing
 
     composite_img = Image.alpha_composite(img_bg, bubble_layer)
-
     with Pilmoji(composite_img, source=AppleEmojiSource) as pilmoji:
         for pos, t, f, col, sp, offs in text_drawings:
             pilmoji.text(
@@ -271,44 +265,52 @@ def render_conversation(
 
 # --- CLI Main Function ---
 def main():
-    if (
-        len(sys.argv) < 5
-    ):  # python renderer.py <command> <original_post_id> <payload_filepath> <target_subreddit>
+    # Expected arguments: python renderer.py <command> <original_post_id> <target_subreddit>
+    if len(sys.argv) < 4:
         print(
-            "Usage: python renderer.py render_and_post_intermediate <original_post_id> <payload_filepath> <target_subreddit>"
+            "Usage: python renderer.py render_and_post_intermediate <original_post_id> <target_subreddit>"
         )
         sys.exit(1)
 
     command = sys.argv[1]
-    original_post_id = sys.argv[2]  # Original Reddit post ID
-    payload_filepath = sys.argv[3]
-    target_subreddit_name = sys.argv[4]
+    original_post_id = sys.argv[2]
+    target_subreddit_name = sys.argv[3]
 
-    # Temporary local path for the rendered image
-    local_output_path = f"{original_post_id}_rendered.png"
-    intermediate_post_title = f"render_result:{original_post_id}"
+    # Read payload from environment variable
+    payload_json_string = os.environ.get("RENDER_PAYLOAD_JSON")
+    if not payload_json_string:
+        print("Error: RENDER_PAYLOAD_JSON environment variable not set or empty.")
+        sys.exit(1)
 
     try:
-        with open(payload_filepath, "r") as f:
-            payload = json.load(f)
-    except Exception as e:
-        print(f"Error reading or parsing payload file {payload_filepath}: {e}")
+        payload = json.loads(payload_json_string)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON from RENDER_PAYLOAD_JSON environment variable: {e}")
+        print(
+            f"Received string: {payload_json_string[:500]}..."
+        )  # Print first 500 chars for debugging
         sys.exit(1)
+
+    local_output_path = f"{original_post_id}_rendered.png"
+    intermediate_post_title = f"render_result:{original_post_id}"
 
     print(
         f"Executing command: {command} for original post: {original_post_id} on subreddit: {target_subreddit_name}"
     )
 
     if command == "render_and_post_intermediate":
-        # 1. Render the image locally
         print(f"Rendering image to temporary file: {local_output_path}")
 
-        # Convert classification strings from payload to Enum members
         parsed_messages = []
         for msg_data in payload.get("messages", []):
             try:
-                # Gemini should provide lowercase classification strings as per SYSTEM_PROMPT
-                classification_enum = Classification(msg_data["classification"].lower())
+                classification_str = msg_data.get("classification")
+                if not classification_str:
+                    print(
+                        f"Warning: Message data missing classification: {msg_data}. Skipping message."
+                    )
+                    continue
+                classification_enum = Classification(classification_str.lower())
                 parsed_messages.append(
                     TextMessage(
                         side=msg_data["side"],
@@ -319,10 +321,8 @@ def main():
                 )
             except ValueError:
                 print(
-                    f"Warning: Unknown classification '{msg_data['classification']}' received. Skipping message or using default."
+                    f"Warning: Unknown classification '{msg_data.get('classification')}' received. Skipping message."
                 )
-                # Optionally, use a default classification or skip the message
-                # For now, let's skip if classification is unknown to avoid errors
                 continue
             except KeyError as ke:
                 print(
@@ -330,16 +330,26 @@ def main():
                 )
                 continue
 
+        # Ensure color data and background hex are present
+        color_data_left = payload.get("color_data_left")
+        color_data_right = payload.get("color_data_right")
+        background_hex = payload.get("background_hex")
+
+        if not all([color_data_left, color_data_right, background_hex]):
+            print(
+                "Error: Missing color_data_left, color_data_right, or background_hex in payload."
+            )
+            sys.exit(1)
+
         render_conversation(
             parsed_messages,
-            payload.get("color_data_left"),
-            payload.get("color_data_right"),
-            payload.get("background_hex"),
+            color_data_left,
+            color_data_right,
+            background_hex,
             local_output_path,
         )
         print("Image rendered successfully.")
 
-        # 2. Initialize PRAW and post to Reddit
         print(f"Initializing PRAW to post to r/{target_subreddit_name}...")
         try:
             reddit = praw.Reddit(
@@ -348,13 +358,12 @@ def main():
                 user_agent=os.environ["REDDIT_USER_AGENT"],
                 username=os.environ["REDDIT_USERNAME"],
                 password=os.environ["REDDIT_PASSWORD"],
-                check_for_async=False,  # Add if PRAW version is new and complains
+                check_for_async=False,
             )
-            reddit.user.me()  # Check authentication
+            reddit.user.me()
             print("PRAW authenticated successfully.")
         except Exception as e:
             print(f"Error initializing or authenticating PRAW: {e}")
-            # Attempt to clean up local file before exiting
             if os.path.exists(local_output_path):
                 os.remove(local_output_path)
             sys.exit(1)
@@ -364,44 +373,40 @@ def main():
             print(
                 f"Submitting image {local_output_path} to r/{target_subreddit_name} with title '{intermediate_post_title}'..."
             )
-
-            # PRAW's submit_image uploads the image and creates an image post.
-            # It does not support selftext directly with submit_image.
-            # The title is used by Devvit to find the original post.
             submission = subreddit.submit_image(
                 title=intermediate_post_title,
                 image_path=local_output_path,
-                # flair_id="your_flair_id", # Optional: if you use flairs
-                # flair_text="your_flair_text", # Optional
-                nsfw=False,  # Set to True if content could be NSFW
+                nsfw=False,
                 spoiler=False,
             )
             print(
                 f"Successfully posted intermediate image to Reddit: {submission.shortlink} (ID: {submission.id})"
             )
-
         except Exception as e:
             print(f"An error occurred during Reddit submission: {e}")
             import traceback
 
             traceback.print_exc()
-            # Attempt to clean up local file before exiting
             if os.path.exists(local_output_path):
                 os.remove(local_output_path)
             sys.exit(1)
+        finally:  # Ensure cleanup even if submission succeeds or fails (after initial error handling)
+            if os.path.exists(local_output_path):
+                try:
+                    os.remove(local_output_path)
+                    print(f"Cleaned up temporary file: {local_output_path}")
+                except Exception as e_remove:
+                    print(
+                        f"Error cleaning up temporary file {local_output_path}: {e_remove}"
+                    )
 
     else:
         print(f"Unknown command: {command}")
-        if os.path.exists(
-            local_output_path
-        ):  # Clean up if command was unknown but file created
-            os.remove(local_output_path)
+        # No local_output_path would have been created if command is unknown from the start
         sys.exit(1)
 
-    # 3. Clean up the local rendered file
-    if os.path.exists(local_output_path):
-        os.remove(local_output_path)
-        print(f"Cleaned up temporary file: {local_output_path}")
+    # Note: Cleanup is now handled within the try/finally block of the command processing.
+    # If the script exits earlier (e.g., bad args, payload error), local_output_path might not exist or be created.
 
 
 if __name__ == "__main__":
