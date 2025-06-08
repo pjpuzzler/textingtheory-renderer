@@ -1,19 +1,21 @@
-name: Render and Upload Image
+name: Render and Post Intermediate Image
 
 on:
   workflow_dispatch:
     inputs:
-      post_id:
-        description: 'The Reddit Post ID, used as the filename.'
+      post_id: # This is the ORIGINAL Reddit Post ID
+        description: 'The Original Reddit Post ID, used for titling the intermediate post.'
         required: true
       render_payload:
         description: 'The JSON data for the renderer script.'
         required: true
+      target_subreddit: # Added input for target subreddit
+        description: 'The subreddit where the bot will post the intermediate image (e.g., u_YourBotName).'
+        required: true
 
 jobs:
-  render-and-upload:
+  render-and-post:
     runs-on: ubuntu-latest
-    # No 'permissions' block needed anymore! We are not writing to the repo.
 
     steps:
       - name: Checkout code
@@ -24,7 +26,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Caching is still a great idea to speed up dependency installation
       - name: Cache pip dependencies
         uses: actions/cache@v4
         with:
@@ -34,15 +35,18 @@ jobs:
             ${{ runner.os }}-python-3.11-pip-
       
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt # Ensure requirements.txt includes praw, Pillow, pilmoji
 
-      - name: Render and Upload to ImageKit
+      - name: Write render_payload to file
+        run: echo '${{ github.event.inputs.render_payload }}' > render_payload.json
+        shell: bash
+
+      - name: Render image and Post to Reddit as Intermediate
         env:
-          # Pass secrets securely to the environment
-          IMAGEKIT_PRIVATE_KEY: ${{ secrets.IMAGEKIT_PRIVATE_KEY }}
-          IMAGEKIT_PUBLIC_KEY: ${{ secrets.IMAGEKIT_PUBLIC_KEY }}
-          IMAGEKIT_URL_ENDPOINT: ${{ secrets.IMAGEKIT_URL_ENDPOINT }}
-          RENDERER_PAYLOAD: ${{ github.event.inputs.render_payload }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }} # e.g., "TextingTheoryRendererGHA/0.1 by u/YourBotName"
+          REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
+          REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
         run: |
-          # We now pass the post_id as an argument to the python script
-          python renderer.py render_and_upload ${{ github.event.inputs.post_id }}
+          python renderer.py render_and_post_intermediate ${{ github.event.inputs.post_id }} render_payload.json ${{ github.event.inputs.target_subreddit }}
