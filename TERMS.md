@@ -1,6 +1,6 @@
 # Terms of Service for TextingTheory Bot
 
-Last updated: [Date]
+Last updated: 6/8/25
 
 Please read these Terms of Service ("Terms") carefully before using the TextingTheory Bot ("Bot", "Service") operated by u/pjpuzzler ("us", "we", or "our").
 

@@ -1,6 +1,6 @@
 # Privacy Policy for TextingTheory Bot
 
-Last updated: [Date]
+Last updated: 6/8/25
 
 This Privacy Policy describes how TextingTheory Bot ("Bot", "we", "us", or "our") collects, uses, and shares information in connection with your use of our Reddit bot services.
 
