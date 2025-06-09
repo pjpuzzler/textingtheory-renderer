@@ -3,14 +3,17 @@ name: Render and Post Intermediate Image
 on:
   workflow_dispatch:
     inputs:
-      post_id: # This is the ORIGINAL Reddit Post ID
-        description: 'The Original Reddit Post ID, used for titling the intermediate post.'
+      reply_to_id:
+        description: 'The ID to reply to after completion, used for titling the intermediate post.'
         required: true
       render_payload:
         description: 'The JSON data for the renderer script.'
         required: true
       target_subreddit: # Added input for target subreddit
-        description: 'The subreddit where the bot will post the intermediate image (e.g., u_YourBotName).'
+        description: 'The subreddit where the bot will post the intermediate image.'
+        required: true
+      type:
+        description: 'The type of the render'
         required: true
 
 jobs:
@@ -49,4 +52,4 @@ jobs:
           RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }} # Pass payload as env var
         run: |
           # The payload_filepath argument is removed from the script call
-          python renderer.py render_and_post_intermediate ${{ github.event.inputs.post_id }} ${{ github.event.inputs.target_subreddit }}
+          python renderer.py render_and_post_intermediate ${{ github.event.inputs.reply_to_id }} ${{ github.event.inputs.target_subreddit }} ${{ github.event.inputs.type }}

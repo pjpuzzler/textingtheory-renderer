@@ -265,16 +265,17 @@ def render_conversation(
 
 # --- CLI Main Function ---
 def main():
-    # Expected arguments: python renderer.py <command> <original_post_id> <target_subreddit>
-    if len(sys.argv) < 4:
+    # Expected arguments: python renderer.py <command> <reply_to_id> <target_subreddit> <type>
+    if len(sys.argv) < 5:
         print(
-            "Usage: python renderer.py render_and_post_intermediate <original_post_id> <target_subreddit>"
+            "Usage: python renderer.py render_and_post_intermediate <reply_to_id> <target_subreddit> <type>"
         )
         sys.exit(1)
 
     command = sys.argv[1]
-    original_post_id = sys.argv[2]
+    reply_to_id = sys.argv[2]
     target_subreddit_name = sys.argv[3]
+    job_type = sys.argv[4]
 
     # Read payload from environment variable
     payload_json_string = os.environ.get("RENDER_PAYLOAD_JSON")
@@ -291,11 +292,17 @@ def main():
         )  # Print first 500 chars for debugging
         sys.exit(1)
 
-    local_output_path = f"{original_post_id}_rendered.png"
-    intermediate_post_title = f"render_result:{original_post_id}"
+    local_output_path = f"{reply_to_id}_rendered.png"
+    if job_type == "analysis":
+        intermediate_post_title = f"render_result_analysis:{reply_to_id}"
+    elif job_type == "annotate":
+        intermediate_post_title = f"render_result_annotate:{reply_to_id}"
+    else:
+        print("Unknown job type")
+        sys.exit(1)
 
     print(
-        f"Executing command: {command} for original post: {original_post_id} on subreddit: {target_subreddit_name}"
+        f"Executing command: {command} for replying to: {reply_to_id} on subreddit: {target_subreddit_name}"
     )
 
     if command == "render_and_post_intermediate":
