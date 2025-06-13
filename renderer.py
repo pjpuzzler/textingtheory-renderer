@@ -337,9 +337,9 @@ def main():
         sys.exit(1)
 
     if job_type == "analysis":
-        api_title = f"render_result_analysis:{post_id}"
+        api_title = f"render_result_analysis_{post_id}"
     elif job_type == "annotate":
-        api_title = f"render_result_annotate:{post_id}"
+        api_title = f"render_result_annotate_{post_id}"
     else:
         print("Unknown job type")
         sys.exit(1)
