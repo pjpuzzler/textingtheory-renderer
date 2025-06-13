@@ -3,8 +3,8 @@ name: Render and Upload Image
 on:
   workflow_dispatch:
     inputs:
-      post_id:
-        description: 'The post ID of the original post.'
+      original_id:
+        description: 'The ID of the original post/comment.'
         required: true
       render_payload:
         description: 'The JSON data for the renderer script.'
@@ -14,7 +14,7 @@ on:
         required: true
 
 jobs:
-  render-and-post:
+  render-and-upload:
     runs-on: ubuntu-latest
 
     steps:
@@ -37,10 +37,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Render image and Post to Reddit as Intermediate
+      - name: Render image and Upload
         env:
           ALLTHEPICS_API_KEY: ${{ secrets.ALLTHEPICS_API_KEY }}
           RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }}
         run: |
           # The payload_filepath argument is removed from the script call
-          python renderer.py render_and_upload ${{ github.event.inputs.post_id }} ${{ github.event.inputs.type }}
+          python renderer.py render_and_upload ${{ github.event.inputs.original_id }} ${{ github.event.inputs.type }}
