@@ -314,7 +314,7 @@ def upload_with_api(
 
 # --- CLI Main Function ---
 def main():
-    if len(sys.argv) < 5:
+    if len(sys.argv) < 4:
         print("Usage: python renderer.py render_and_upload <post_id> <type>")
         sys.exit(1)
 
