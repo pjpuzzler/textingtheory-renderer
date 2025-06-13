@@ -1,3 +1,4 @@
+import requests
 import enum
 import json
 import os
@@ -263,21 +264,64 @@ def render_conversation(
     final_img.save(output_path)
 
 
+def upload_with_api(
+    api_key, file_path, title=None, expiration=None
+):  # Added expiration parameter
+    """
+    Uploads an image to allthepics.net using their official V1 API.
+    """
+    if not os.path.exists(file_path):
+        print(f"Error: File not found at '{file_path}'")
+        return None
+
+    api_url = "https://allthepics.net/api/1/upload"
+    headers = {"X-API-Key": api_key}
+
+    data = {}
+    if title:
+        data["title"] = title
+    if expiration:  # Add expiration to the request data
+        data["expiration"] = expiration
+
+    try:
+        with open(file_path, "rb") as f:
+            files = {"source": f}
+            print(
+                f"Uploading '{os.path.basename(file_path)}' to image host with title '{title}'..."
+            )
+
+            response = requests.post(api_url, headers=headers, data=data, files=files)
+            response.raise_for_status()  # Raises an exception for bad status codes (4xx or 5xx)
+            json_response = response.json()
+
+            if json_response.get("status_code") == 200:
+                print("Upload successful!")
+                image_info = json_response.get("image", {})
+                return {
+                    "image_url": image_info.get("url"),
+                    "delete_url": image_info.get("delete_url"),
+                }
+            else:
+                error_message = json_response.get("error", {}).get(
+                    "message", "Unknown API error"
+                )
+                print(f"API Error: {error_message}")
+                return None
+    except requests.exceptions.RequestException as e:
+        print(f"A network or API error occurred: {e}")
+        return None
+
+
 # --- CLI Main Function ---
 def main():
-    # Expected arguments: python renderer.py <command> <reply_to_id> <target_subreddit> <type>
     if len(sys.argv) < 5:
-        print(
-            "Usage: python renderer.py render_and_post_intermediate <reply_to_id> <target_subreddit> <type>"
-        )
+        print("Usage: python renderer.py render_and_upload <post_id> <type>")
         sys.exit(1)
 
     command = sys.argv[1]
-    reply_to_id = sys.argv[2]
-    target_subreddit_name = sys.argv[3]
-    job_type = sys.argv[4]
+    post_id = sys.argv[2]
+    job_type = sys.argv[3]
 
-    # Read payload from environment variable
     payload_json_string = os.environ.get("RENDER_PAYLOAD_JSON")
     if not payload_json_string:
         print("Error: RENDER_PAYLOAD_JSON environment variable not set or empty.")
@@ -292,20 +336,19 @@ def main():
         )  # Print first 500 chars for debugging
         sys.exit(1)
 
-    local_output_path = f"{reply_to_id}_rendered.png"
     if job_type == "analysis":
-        intermediate_post_title = f"render_result_analysis:{reply_to_id}"
+        api_title = f"render_result_analysis:{post_id}"
     elif job_type == "annotate":
-        intermediate_post_title = f"render_result_annotate:{reply_to_id}"
+        api_title = f"render_result_annotate:{post_id}"
     else:
         print("Unknown job type")
         sys.exit(1)
 
-    print(
-        f"Executing command: {command} for replying to: {reply_to_id} on subreddit: {target_subreddit_name}"
-    )
+    local_output_path = f"{api_title}.png"
 
-    if command == "render_and_post_intermediate":
+    print(f"Executing command: {command} for replying to: {post_id}")
+
+    if command == "render_and_upload":
         print(f"Rendering image to temporary file: {local_output_path}")
 
         parsed_messages = []
@@ -337,7 +380,6 @@ def main():
                 )
                 continue
 
-        # Extract color data from the standard Analysis format
         color_block = payload.get("color", {})
         color_data_left = color_block.get("left")
         color_data_right = color_block.get("right")
@@ -352,60 +394,35 @@ def main():
         )
         print("Image rendered successfully.")
 
-        print(f"Initializing PRAW to post to r/{target_subreddit_name}...")
         try:
-            reddit = praw.Reddit(
-                client_id=os.environ["REDDIT_CLIENT_ID"],
-                client_secret=os.environ["REDDIT_CLIENT_SECRET"],
-                user_agent=os.environ["REDDIT_USER_AGENT"],
-                username=os.environ["REDDIT_USERNAME"],
-                password=os.environ["REDDIT_PASSWORD"],
-                check_for_async=False,
-            )
-            reddit.user.me()
-            print("PRAW authenticated successfully.")
-        except Exception as e:
-            print(f"Error initializing or authenticating PRAW: {e}")
-            if os.path.exists(local_output_path):
-                os.remove(local_output_path)
-            sys.exit(1)
+            api_key = os.environ.get("ALLTHEPICS_API_KEY")
+            if not api_key:
+                print("Error: ALLTHEPICS_API_KEY environment variable not set.")
+                if os.path.exists(local_output_path):
+                    os.remove(local_output_path)
+                sys.exit(1)
 
-        # Prepare minimized analysis for post body (strip message content, keep standard Analysis format)
-        # comment_analysis = dict(payload)
-        # if "messages" in comment_analysis:
-        #     comment_analysis["messages"] = [
-        #         {**msg, "content": ""} for msg in comment_analysis["messages"]
-        #     ]
-        comment_json = json.dumps(payload, separators=(",", ":"))
+            upload_result = upload_with_api(
+                api_key, local_output_path, title=api_title, expiration="PT5M"
+            )
 
-        try:
-            subreddit = reddit.subreddit(target_subreddit_name)
-            print(
-                f"Submitting image {local_output_path} to r/{target_subreddit_name} with title '{intermediate_post_title}'..."
-            )
-            submission = subreddit.submit_image(
-                title=intermediate_post_title,
-                image_path=local_output_path,
-                nsfw=False,
-                spoiler=False,
-            )
-            print(
-                f"Successfully posted intermediate image to Reddit: {submission.shortlink} (ID: {submission.id})"
-            )
-            # Post minimized analysis as a comment
-            submission.reply(comment_json)
-            print(
-                "Posted minimized analysis as a comment on the intermediate image post."
-            )
+            if not upload_result or not upload_result.get("image_url"):
+                print("Failed to upload image to host. Aborting Reddit post.")
+                if os.path.exists(local_output_path):
+                    os.remove(local_output_path)
+                sys.exit(1)
+
+            image_url = upload_result["image_url"]
+            print(f"Image available at: {image_url}")
         except Exception as e:
-            print(f"An error occurred during Reddit submission: {e}")
+            print(f"An error occurred during uploading: {e}")
             import traceback
 
             traceback.print_exc()
             if os.path.exists(local_output_path):
                 os.remove(local_output_path)
             sys.exit(1)
-        finally:  # Ensure cleanup even if submission succeeds or fails (after initial error handling)
+        finally:
             if os.path.exists(local_output_path):
                 try:
                     os.remove(local_output_path)
@@ -414,14 +431,9 @@ def main():
                     print(
                         f"Error cleaning up temporary file {local_output_path}: {e_remove}"
                     )
-
     else:
         print(f"Unknown command: {command}")
-        # No local_output_path would have been created if command is unknown from the start
         sys.exit(1)
-
-    # Note: Cleanup is now handled within the try/finally block of the command processing.
-    # If the script exits earlier (e.g., bad args, payload error), local_output_path might not exist or be created.
 
 
 if __name__ == "__main__":

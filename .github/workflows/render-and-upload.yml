@@ -1,16 +1,13 @@
-name: Render and Post Intermediate Image
+name: Render and Upload Image
 
 on:
   workflow_dispatch:
     inputs:
-      reply_to_id:
-        description: 'The ID to reply to after completion, used for titling the intermediate post.'
+      post_id:
+        description: 'The post ID of the original post.'
         required: true
       render_payload:
         description: 'The JSON data for the renderer script.'
-        required: true
-      target_subreddit: # Added input for target subreddit
-        description: 'The subreddit where the bot will post the intermediate image.'
         required: true
       type:
         description: 'The type of the render'
@@ -38,18 +35,12 @@ jobs:
             ${{ runner.os }}-python-3.11-pip-
       
       - name: Install dependencies
-        run: pip install -r requirements.txt # Ensure requirements.txt includes praw, Pillow, pilmoji
-
-      # The "Write render_payload to file" step is REMOVED
+        run: pip install -r requirements.txt
 
       - name: Render image and Post to Reddit as Intermediate
         env:
-          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
-          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
-          REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
-          REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
-          REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
-          RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }} # Pass payload as env var
+          ALLTHEPICS_API_KEY: ${{ secrets.ALLTHEPICS_API_KEY }}
+          RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }}
         run: |
           # The payload_filepath argument is removed from the script call
-          python renderer.py render_and_post_intermediate ${{ github.event.inputs.reply_to_id }} ${{ github.event.inputs.target_subreddit }} ${{ github.event.inputs.type }}
+          python renderer.py render_and_upload ${{ github.event.inputs.post_id }} ${{ github.event.inputs.type }}
