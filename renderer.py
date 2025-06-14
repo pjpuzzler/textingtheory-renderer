@@ -29,6 +29,7 @@ class Classification(enum.Enum):
     MISS = "miss"
     MISTAKE = "mistake"
     RESIGN = "resign"
+    SUPERBRILLIANT = "superbrilliant"
     TIMEOUT = "timeout"
     WINNER = "winner"
 
