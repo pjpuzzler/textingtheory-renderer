@@ -3,7 +3,6 @@ import enum
 import json
 import os
 import sys
-import praw  # For posting to Reddit
 from dataclasses import dataclass
 from PIL import Image, ImageDraw, ImageFont, ImageColor
 from pilmoji import Pilmoji
