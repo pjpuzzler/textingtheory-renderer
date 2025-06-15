@@ -1,0 +1,18 @@
+name: 3. Set Saturday Status
+on:
+  schedule:
+    - cron: "0 5 * * 6" # Runs at 00:00 Saturday EST (5:00 UTC)
+  workflow_dispatch:
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.10" }
+      - run: pip install requests
+      - name: Set Saturday Status
+        env:
+          REDDIT_COOKIE: ${{ secrets.REDDIT_COOKIE }}
+          REDDIT_CSRF_TOKEN: ${{ secrets.REDDIT_CSRF_TOKEN }}
+        run: python set_saturday_status.py
