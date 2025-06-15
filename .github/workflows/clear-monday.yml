@@ -1,4 +1,4 @@
-name: 2. Clear Monday Status
+name: Clear Monday Status
 on:
   schedule:
     - cron: "0 5 * * 2" # Runs at 00:00 Tuesday EST (5:00 UTC)

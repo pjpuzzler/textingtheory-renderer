@@ -1,4 +1,4 @@
-name: 1. Set Monday Status
+name: Set Monday Status
 on:
   schedule:
     - cron: "0 5 * * 1" # Runs at 00:00 Monday EST (5:00 UTC)
