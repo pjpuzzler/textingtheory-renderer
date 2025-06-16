@@ -2,11 +2,8 @@ name: Test Monday schedule
 
 on:
   schedule:
-    - cron: "24 9 * * MON"
+    - cron: "26 13 * * MON"
   workflow_dispatch:
-
-env:
-  TZ: "America/New_York"
 
 jobs:
   check-schedule:
