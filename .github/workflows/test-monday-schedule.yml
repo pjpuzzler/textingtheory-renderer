@@ -1,0 +1,18 @@
+name: Test Monday schedule
+
+on:
+  schedule:
+    - cron: "18 13 * * MON"
+  workflow_dispatch:
+
+jobs:
+  check-schedule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm Schedule Triggered
+        run: |
+          echo "Hello from the scheduled workflow!"
+          echo "This workflow was triggered by the cron schedule at 9:18 AM EST on Monday."
+          echo "Current UTC time on runner: $(date -u)"
+          echo "Current EST time (approx) on runner: $(TZ='America/New_York' date)"
+          echo "This is just a test to verify cron scheduling."
