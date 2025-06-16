@@ -2,7 +2,7 @@ name: Test Monday schedule
 
 on:
   schedule:
-    - cron: "18 13 * * MON"
+    - cron: "22 9 * * MON"
   workflow_dispatch:
 
 jobs:
