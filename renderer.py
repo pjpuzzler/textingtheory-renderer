@@ -3,6 +3,7 @@ import enum
 import json
 import os
 import sys
+import time
 from dataclasses import dataclass
 from PIL import Image, ImageDraw, ImageFont, ImageColor
 from pilmoji import Pilmoji
@@ -266,9 +267,10 @@ def render_conversation(
 
 def upload_with_api(
     api_key, file_path, title=None, expiration=None
-):  # Added expiration parameter
+):
     """
     Uploads an image to allthepics.net using their official V1 API.
+    Retries up to 3 times if a network or API error occurs.
     """
     if not os.path.exists(file_path):
         print(f"Error: File not found at '{file_path}'")
@@ -283,33 +285,41 @@ def upload_with_api(
     if expiration:  # Add expiration to the request data
         data["expiration"] = expiration
 
-    try:
-        with open(file_path, "rb") as f:
-            files = {"source": f}
-            print(
-                f"Uploading '{os.path.basename(file_path)}' to image host with title '{title}'..."
-            )
-
-            response = requests.post(api_url, headers=headers, data=data, files=files)
-            response.raise_for_status()  # Raises an exception for bad status codes (4xx or 5xx)
-            json_response = response.json()
-
-            if json_response.get("status_code") == 200:
-                print("Upload successful!")
-                image_info = json_response.get("image", {})
-                return {
-                    "image_url": image_info.get("url"),
-                    "delete_url": image_info.get("delete_url"),
-                }
-            else:
-                error_message = json_response.get("error", {}).get(
-                    "message", "Unknown API error"
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            with open(file_path, "rb") as f:
+                files = {"source": f}
+                print(
+                    f"Uploading '{os.path.basename(file_path)}' to image host with title '{title}'... (Attempt {attempt})"
                 )
-                print(f"API Error: {error_message}")
+
+                response = requests.post(api_url, headers=headers, data=data, files=files)
+                response.raise_for_status()  # Raises an exception for bad status codes (4xx or 5xx)
+                json_response = response.json()
+
+                if json_response.get("status_code") == 200:
+                    print("Upload successful!")
+                    image_info = json_response.get("image", {})
+                    return {
+                        "image_url": image_info.get("url"),
+                        "delete_url": image_info.get("delete_url"),
+                    }
+                else:
+                    error_message = json_response.get("error", {}).get(
+                        "message", "Unknown API error"
+                    )
+                    print(f"API Error: {error_message}")
+                    # Only retry on network/API errors, not on logical errors
+                    return None
+        except requests.exceptions.RequestException as e:
+            print(f"A network or API error occurred: {e}")
+            if attempt < max_retries:
+                print(f"Retrying in 2 seconds... (Attempt {attempt + 1} of {max_retries})")
+                time.sleep(2)
+            else:
+                print("Max retries reached. Giving up.")
                 return None
-    except requests.exceptions.RequestException as e:
-        print(f"A network or API error occurred: {e}")
-        return None
 
 
 # --- CLI Main Function ---
