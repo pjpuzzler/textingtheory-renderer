@@ -3,14 +3,11 @@ name: Render and Upload Image
 on:
   workflow_dispatch:
     inputs:
-      original_id:
-        description: 'The ID of the original post/comment.'
+      uid:
+        description: "The UID to use for the filename."
         required: true
       render_payload:
-        description: 'The JSON data for the renderer script.'
-        required: true
-      type:
-        description: 'The type of the render'
+        description: "The JSON data for the renderer script."
         required: true
 
 jobs:
@@ -24,7 +21,7 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Cache pip dependencies
         uses: actions/cache@v4
@@ -33,7 +30,7 @@ jobs:
           key: ${{ runner.os }}-python-3.11-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-python-3.11-pip-
-      
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
@@ -43,4 +40,4 @@ jobs:
           RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }}
         run: |
           # The payload_filepath argument is removed from the script call
-          python renderer.py render_and_upload ${{ github.event.inputs.original_id }} ${{ github.event.inputs.type }}
+          python renderer.py render_and_upload ${{ github.event.inputs.uid }}

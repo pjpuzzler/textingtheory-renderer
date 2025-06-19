@@ -324,13 +324,7 @@ def upload_with_api(
 
 # --- CLI Main Function ---
 def main():
-    if len(sys.argv) < 4:
-        print("Usage: python renderer.py render_and_upload <original_id> <type>")
-        sys.exit(1)
-
-    command = sys.argv[1]
-    original_id = sys.argv[2]
-    job_type = sys.argv[3]
+    _, command, uid = sys.argv
 
     payload_json_string = os.environ.get("RENDER_PAYLOAD_JSON")
     if not payload_json_string:
@@ -346,17 +340,9 @@ def main():
         )  # Print first 500 chars for debugging
         sys.exit(1)
 
-    if job_type == "analysis":
-        api_title = f"render_result_analysis_{original_id}"
-    elif job_type == "annotate":
-        api_title = f"render_result_annotate_{original_id}"
-    else:
-        print("Unknown job type")
-        sys.exit(1)
+    local_output_path = f"{uid}.png"
 
-    local_output_path = f"{api_title}.png"
-
-    print(f"Executing command: {command} for replying to: {original_id}")
+    print(f"Executing command: {command} for replying to: {uid}")
 
     if command == "render_and_upload":
         print(f"Rendering image to temporary file: {local_output_path}")
@@ -413,7 +399,7 @@ def main():
                 sys.exit(1)
 
             upload_result = upload_with_api(
-                api_key, local_output_path, title=api_title, expiration="PT5M"
+                api_key, local_output_path, title=uid, expiration="PT5M"
             )
 
             if not upload_result or not upload_result.get("image_url"):
