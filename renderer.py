@@ -635,6 +635,21 @@ def upload_with_api(api_key, file_path, title=None, expiration=None):
                 return None
 
 
+def get_reddit_icon(username: str) -> str | None:
+    try:
+        response = requests.get(
+            f"https://www.reddit.com/user/{username}/about.json",
+            headers={"User-Agent": "RedditChainRenderer/0.1"},
+            timeout=5,
+        )
+        response.raise_for_status()
+        user_data = response.json()
+        return user_data.get("data", {}).get("icon_img")
+    except Exception as e:
+        print(f"Warning: Failed to fetch icon for user '{username}': {e}")
+        return None
+
+
 # --- CLI Main Function ---
 def main():
     _, command, uid = sys.argv
@@ -753,12 +768,14 @@ def main():
                     )
                     continue
                 classification_enum = Classification(classification_str.lower())
+                icon_img_url = get_reddit_icon(msg_data["username"])
+
                 parsed_messages.append(
                     RedditComment(
                         username=msg_data["username"],
                         content=msg_data["content"],
                         classification=classification_enum,
-                        icon_img=msg_data["iconImg"],
+                        icon_img=icon_img_url,
                     )
                 )
             except ValueError:
