@@ -740,6 +740,7 @@ def main():
                         f"Error cleaning up temporary file {local_output_path}: {e_remove}"
                     )
     elif command == "render_and_upload_reddit_chain":
+        print(payload)
         print(f"Rendering image to temporary file: {local_output_path}")
 
         parsed_messages = []
