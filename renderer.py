@@ -350,8 +350,8 @@ def render_reddit_chain(
     TEXT_BADGE_HORIZONTAL_GAP = 30
 
     try:
-        font_username = ImageFont.truetype("Arial Bold.ttf", 56)
-        font_text = ImageFont.truetype("Arial.ttf", 64)
+        font_username = ImageFont.truetype("fonts/Arial Bold.ttf", 56)
+        font_text = ImageFont.truetype("fonts/Arial.ttf", 64)
     except IOError:
         print("Warning: Arial fonts not found. Using default.")
         font_username = ImageFont.load_default()
