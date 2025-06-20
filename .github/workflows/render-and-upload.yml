@@ -9,6 +9,10 @@ on:
       render_payload:
         description: "The JSON data for the renderer script."
         required: true
+      command:
+        description: "The command to run (render_and_upload or render_and_upload_reddit_chain)."
+        required: true
+        default: "render_and_upload"
 
 jobs:
   render-and-upload:
@@ -40,4 +44,4 @@ jobs:
           RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }}
         run: |
           # The payload_filepath argument is removed from the script call
-          python renderer.py render_and_upload ${{ github.event.inputs.uid }}
+          python renderer.py ${{ github.event.inputs.command }} ${{ github.event.inputs.uid }}

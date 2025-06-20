@@ -1,3 +1,4 @@
+import io
 import requests
 import enum
 import json
@@ -7,10 +8,9 @@ import time
 from dataclasses import dataclass
 from PIL import Image, ImageDraw, ImageFont, ImageColor
 from pilmoji import Pilmoji
-from pilmoji.source import AppleEmojiSource  # Or your preferred emoji source
+from pilmoji.source import AppleEmojiSource
 
 
-# --- Rendering Logic (previously texting_theory.py) ---
 class Classification(enum.Enum):
     ABANDON = "abandon"
     BEST = "best"
@@ -55,6 +55,14 @@ class TextMessage:
     avatar_url: str = None
 
 
+@dataclass
+class RedditComment:
+    username: str
+    content: str
+    classification: Classification
+    snoovatar_url: str | None = None
+
+
 def wrap_text(text, draw, font, max_width):
     def ellipsize(word):
         ellipsis = "..."
@@ -90,6 +98,58 @@ def wrap_text(text, draw, font, max_width):
         if line:
             lines.append(line)
     return "\n".join(lines)
+
+
+def wrap_text_by_width(text: str, font, max_width: int, measure_fn) -> list[str]:
+    lines = []
+    if not text.strip():
+        return []
+
+    for paragraph in text.split("\n"):
+        words = paragraph.split(" ")
+        current_line_being_built = ""
+        for word_idx, word in enumerate(words):
+            if (
+                not word
+                and word_idx > 0
+                and (not words[word_idx - 1] or current_line_being_built.endswith(" "))
+            ):
+                continue
+            if not word and not current_line_being_built:
+                continue
+
+            test_line = (
+                f"{current_line_being_built} {word}".strip()
+                if current_line_being_built
+                else word
+            )
+
+            w, _ = measure_fn(test_line, font)
+            if w <= max_width:
+                current_line_being_built = test_line
+            else:
+                if current_line_being_built:
+                    lines.append(current_line_being_built)
+
+                word_w_itself, _ = measure_fn(word, font)
+                if word_w_itself <= max_width:
+                    current_line_being_built = word
+                else:
+                    sub_word_segment = ""
+                    for char_in_word in word:
+                        test_char_segment = sub_word_segment + char_in_word
+                        char_seg_w, _ = measure_fn(test_char_segment, font)
+                        if char_seg_w <= max_width:
+                            sub_word_segment = test_char_segment
+                        else:
+                            if sub_word_segment:
+                                lines.append(sub_word_segment)
+                            sub_word_segment = char_in_word
+                    current_line_being_built = sub_word_segment
+
+        if current_line_being_built:
+            lines.append(current_line_being_built)
+    return lines
 
 
 def render_conversation(
@@ -265,9 +325,258 @@ def render_conversation(
     final_img.save(output_path)
 
 
-def upload_with_api(
-    api_key, file_path, title=None, expiration=None
+def render_reddit_chain(
+    messages: list[RedditComment],
+    output_path: str,
+    *,
+    max_image_width: int = 1280,
+    bg_color: str = "#101214",
+    username_color: str = "#8FA1AB",
+    text_color: str = "#D4D7D9",
 ):
+    SIDE_MARGIN = 45
+    TOP_MARGIN = 45
+    BETWEEN_MESSAGES_VERTICAL_SPACING = 40
+    BOTTOM_IMAGE_PADDING = BETWEEN_MESSAGES_VERTICAL_SPACING
+
+    AVATAR_SIZE = 136
+
+    USERNAME_AVATAR_HORIZONTAL_GAP = 30
+    AVATAR_TEXT_BLOCK_VERTICAL_SPACING = 50
+
+    TEXT_LINE_LEADING = 18
+
+    BADGE_SIZE = 144
+    TEXT_BADGE_HORIZONTAL_GAP = 30
+
+    try:
+        font_username = ImageFont.truetype("Arial Bold.ttf", 56)
+        font_text = ImageFont.truetype("Arial.ttf", 64)
+    except IOError:
+        print("Warning: Arial fonts not found. Using default.")
+        font_username = ImageFont.load_default()
+        font_text = ImageFont.load_default()
+
+    dummy_image = Image.new("RGB", (1, 1))
+    measurer = ImageDraw.Draw(dummy_image)
+
+    def measure(text_to_measure, font_to_use):
+        if not text_to_measure:
+            return (0, 0)
+        bbox = measurer.textbbox((0, 0), text_to_measure, font=font_to_use, anchor="lt")
+        return bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+    TEXT_LINE_BBOX_HEIGHT = measure("Tg", font_text)[1]
+
+    if not messages:
+        final_height = TOP_MARGIN + BOTTOM_IMAGE_PADDING
+        canvas = Image.new("RGB", (max_image_width, final_height), bg_color)
+        canvas.save(output_path)
+        print("No messages to render. Saved empty image.")
+        return
+
+    message_layouts = []
+    for msg in messages:
+        max_text_width = (
+            max_image_width
+            - SIDE_MARGIN
+            - (BADGE_SIZE + TEXT_BADGE_HORIZONTAL_GAP + SIDE_MARGIN)
+        )
+        wrapped_lines = wrap_text_by_width(
+            msg.content, font_text, max_text_width, measure
+        )
+
+        text_block_height = 0
+        if wrapped_lines:
+            text_block_height = (len(wrapped_lines) * TEXT_LINE_BBOX_HEIGHT) + (
+                (len(wrapped_lines) - 1) * TEXT_LINE_LEADING
+                if len(wrapped_lines) > 1
+                else 0
+            )
+
+        badge_path_check = msg.classification.png_path("white")
+        badge_exists_check = os.path.exists(badge_path_check)
+
+        message_layouts.append(
+            {
+                "lines": wrapped_lines,
+                "text_block_height": text_block_height,
+                "username_width": measure(msg.username, font_username)[0],
+                "username_height": measure(msg.username, font_username)[1],
+                "badge_exists": badge_exists_check,
+                "badge_path": badge_path_check if badge_exists_check else None,
+            }
+        )
+
+    message_draw_details = []
+    current_y_cursor = TOP_MARGIN
+
+    for idx, msg_layout_info in enumerate(message_layouts):
+
+        avatar_draw_x = SIDE_MARGIN
+        avatar_draw_y = current_y_cursor
+        avatar_center_y = avatar_draw_y + AVATAR_SIZE / 2
+        avatar_bottom_y = avatar_draw_y + AVATAR_SIZE
+
+        username_draw_x = avatar_draw_x + AVATAR_SIZE + USERNAME_AVATAR_HORIZONTAL_GAP
+        username_draw_y = avatar_center_y - (msg_layout_info["username_height"] / 2)
+        username_bottom_y = username_draw_y + msg_layout_info["username_height"]
+
+        current_text_block_height = msg_layout_info["text_block_height"]
+        text_block_actual_start_x = avatar_draw_x
+        text_block_actual_start_y = avatar_bottom_y + AVATAR_TEXT_BLOCK_VERTICAL_SPACING
+        text_block_actual_bottom_y = (
+            text_block_actual_start_y + current_text_block_height
+        )
+
+        badge_draw_x = max_image_width - SIDE_MARGIN - BADGE_SIZE
+        badge_is_present = msg_layout_info["badge_exists"]
+        badge_draw_y = 0
+        badge_actual_bottom_y = text_block_actual_start_y
+
+        if badge_is_present:
+
+            effective_text_height_for_badge_centering = current_text_block_height
+            if current_text_block_height == 0:
+                effective_text_height_for_badge_centering = TEXT_LINE_BBOX_HEIGHT
+
+            badge_draw_y = (
+                text_block_actual_start_y
+                + (effective_text_height_for_badge_centering - BADGE_SIZE) / 2
+            )
+            badge_actual_bottom_y = badge_draw_y + BADGE_SIZE
+
+        lowest_of_avatar_username_row = max(avatar_bottom_y, username_bottom_y)
+
+        elements_below_avatar_bottoms = [text_block_actual_bottom_y]
+        if badge_is_present:
+            elements_below_avatar_bottoms.append(badge_actual_bottom_y)
+        else:
+            if current_text_block_height == 0:
+                elements_below_avatar_bottoms.append(text_block_actual_start_y)
+
+        lowest_of_elements_below_avatar = max(elements_below_avatar_bottoms)
+
+        current_message_content_bottom_y = max(
+            lowest_of_avatar_username_row, lowest_of_elements_below_avatar
+        )
+
+        message_draw_details.append(
+            {
+                "avatar_pos": (avatar_draw_x, avatar_draw_y),
+                "username_pos": (username_draw_x, username_draw_y),
+                "text_lines": msg_layout_info["lines"],
+                "text_block_start_pos": (
+                    text_block_actual_start_x,
+                    text_block_actual_start_y,
+                ),
+                "badge_pos": (badge_draw_x, badge_draw_y),
+                "badge_exists": badge_is_present,
+                "badge_path": msg_layout_info["badge_path"],
+                "content_bottom_y": current_message_content_bottom_y,
+            }
+        )
+
+        current_y_cursor = (
+            current_message_content_bottom_y + BETWEEN_MESSAGES_VERTICAL_SPACING
+        )
+
+    if not message_draw_details:
+        final_image_height = TOP_MARGIN + BOTTOM_IMAGE_PADDING
+    else:
+        last_message_content_bottom = message_draw_details[-1]["content_bottom_y"]
+        final_image_height = int(last_message_content_bottom + BOTTOM_IMAGE_PADDING)
+
+    min_height_calc = (
+        TOP_MARGIN
+        + AVATAR_SIZE
+        + AVATAR_TEXT_BLOCK_VERTICAL_SPACING
+        + BOTTOM_IMAGE_PADDING
+    )
+    final_image_height = max(final_image_height, min_height_calc)
+
+    canvas = Image.new("RGB", (max_image_width, int(final_image_height)), bg_color)
+    draw = ImageDraw.Draw(canvas)
+
+    for idx, details in enumerate(message_draw_details):
+        msg_obj = messages[idx]
+
+        if not msg_obj.snoovatar_url:
+            avatar_source_img = Image.new("RGBA", (AVATAR_SIZE, AVATAR_SIZE), "#888")
+        else:
+            try:
+                resp = requests.get(msg_obj.snoovatar_url, timeout=5)
+                resp.raise_for_status()
+                avatar_source_img = Image.open(io.BytesIO(resp.content)).convert("RGBA")
+            except requests.exceptions.RequestException as e:
+                avatar_source_img = Image.new(
+                    "RGBA", (AVATAR_SIZE, AVATAR_SIZE), "#888"
+                )
+            except IOError:
+                avatar_source_img = Image.new(
+                    "RGBA", (AVATAR_SIZE, AVATAR_SIZE), "#888"
+                )
+
+        hires_avatar_size = AVATAR_SIZE * 4
+        hires_avatar = avatar_source_img.resize(
+            (hires_avatar_size, hires_avatar_size), Image.LANCZOS
+        )
+        avatar_bg_hires = Image.new(
+            "RGBA", (hires_avatar_size, hires_avatar_size), bg_color
+        )
+        avatar_bg_hires.paste(hires_avatar, (0, 0), hires_avatar)
+        mask_hires = Image.new("L", (hires_avatar_size, hires_avatar_size), 0)
+        ImageDraw.Draw(mask_hires).ellipse(
+            (0, 0, hires_avatar_size, hires_avatar_size), fill=255
+        )
+        final_avatar = avatar_bg_hires.resize((AVATAR_SIZE, AVATAR_SIZE), Image.LANCZOS)
+        final_mask = mask_hires.resize((AVATAR_SIZE, AVATAR_SIZE), Image.LANCZOS)
+        canvas.paste(
+            final_avatar,
+            (int(details["avatar_pos"][0]), int(details["avatar_pos"][1])),
+            final_mask,
+        )
+
+        draw.text(
+            (int(details["username_pos"][0]), int(details["username_pos"][1])),
+            msg_obj.username,
+            font=font_username,
+            fill=username_color,
+            anchor="lt",
+        )
+
+        current_text_y = details["text_block_start_pos"][1]
+        for line_text in details["text_lines"]:
+            draw.text(
+                (int(details["text_block_start_pos"][0]), int(current_text_y)),
+                line_text,
+                font=font_text,
+                fill=text_color,
+                anchor="lt",
+            )
+            current_text_y += TEXT_LINE_BBOX_HEIGHT + TEXT_LINE_LEADING
+
+        if details["badge_exists"] and details["badge_path"]:
+            try:
+                badge_img = Image.open(details["badge_path"]).convert("RGBA")
+                badge_img_resized = badge_img.resize(
+                    (BADGE_SIZE, BADGE_SIZE), Image.LANCZOS
+                )
+                canvas.paste(
+                    badge_img_resized,
+                    (int(details["badge_pos"][0]), int(details["badge_pos"][1])),
+                    badge_img_resized,
+                )
+            except FileNotFoundError:
+                print(f"Badge file not found: {details['badge_path']}")
+            except IOError:
+                print(f"Could not open badge: {details['badge_path']}")
+
+    canvas.save(output_path)
+    print(f"Reddit chain image saved to {output_path}")
+
+
+def upload_with_api(api_key, file_path, title=None, expiration=None):
     """
     Uploads an image to allthepics.net using their official V1 API.
     Retries up to 3 times if a network or API error occurs.
@@ -294,7 +603,9 @@ def upload_with_api(
                     f"Uploading '{os.path.basename(file_path)}' to image host with title '{title}'... (Attempt {attempt})"
                 )
 
-                response = requests.post(api_url, headers=headers, data=data, files=files)
+                response = requests.post(
+                    api_url, headers=headers, data=data, files=files
+                )
                 response.raise_for_status()  # Raises an exception for bad status codes (4xx or 5xx)
                 json_response = response.json()
 
@@ -315,7 +626,9 @@ def upload_with_api(
         except requests.exceptions.RequestException as e:
             print(f"A network or API error occurred: {e}")
             if attempt < max_retries:
-                print(f"Retrying in 2 seconds... (Attempt {attempt + 1} of {max_retries})")
+                print(
+                    f"Retrying in 2 seconds... (Attempt {attempt + 1} of {max_retries})"
+                )
                 time.sleep(2)
             else:
                 print("Max retries reached. Giving up.")
@@ -386,6 +699,81 @@ def main():
             color_data_left,
             color_data_right,
             background_hex,
+            local_output_path,
+        )
+        print("Image rendered successfully.")
+
+        try:
+            api_key = os.environ.get("ALLTHEPICS_API_KEY")
+            if not api_key:
+                print("Error: ALLTHEPICS_API_KEY environment variable not set.")
+                if os.path.exists(local_output_path):
+                    os.remove(local_output_path)
+                sys.exit(1)
+
+            upload_result = upload_with_api(
+                api_key, local_output_path, title=uid, expiration="PT5M"
+            )
+
+            if not upload_result or not upload_result.get("image_url"):
+                print("Failed to upload image to host. Aborting Reddit post.")
+                if os.path.exists(local_output_path):
+                    os.remove(local_output_path)
+                sys.exit(1)
+
+            image_url = upload_result["image_url"]
+            print(f"Image available at: {image_url}")
+        except Exception as e:
+            print(f"An error occurred during uploading: {e}")
+            import traceback
+
+            traceback.print_exc()
+            if os.path.exists(local_output_path):
+                os.remove(local_output_path)
+            sys.exit(1)
+        finally:
+            if os.path.exists(local_output_path):
+                try:
+                    os.remove(local_output_path)
+                    print(f"Cleaned up temporary file: {local_output_path}")
+                except Exception as e_remove:
+                    print(
+                        f"Error cleaning up temporary file {local_output_path}: {e_remove}"
+                    )
+    elif command == "render_and_upload_reddit_chain":
+        print(f"Rendering image to temporary file: {local_output_path}")
+
+        parsed_messages = []
+        for msg_data in payload:
+            try:
+                classification_str = msg_data.get("classification")
+                if not classification_str:
+                    print(
+                        f"Warning: Message data missing classification: {msg_data}. Skipping message."
+                    )
+                    continue
+                classification_enum = Classification(classification_str.lower())
+                parsed_messages.append(
+                    RedditComment(
+                        username=msg_data["username"],
+                        content=msg_data["content"],
+                        classification=classification_enum,
+                        snoovatar_url=msg_data.get("snoovatarUrl", None),
+                    )
+                )
+            except ValueError:
+                print(
+                    f"Warning: Unknown classification '{msg_data.get('classification')}' received. Skipping message."
+                )
+                continue
+            except KeyError as ke:
+                print(
+                    f"Warning: Message data missing key {ke}: {msg_data}. Skipping message."
+                )
+                continue
+
+        render_reddit_chain(
+            parsed_messages,
             local_output_path,
         )
         print("Image rendered successfully.")
