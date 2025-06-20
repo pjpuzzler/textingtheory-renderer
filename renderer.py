@@ -470,7 +470,7 @@ def render_reddit_chain(
                     text_block_actual_start_x,
                     text_block_actual_start_y,
                 ),
-                "badge_pos": (badge_draw_x, badge_draw_y),
+                "badge_pos": (badge_draw_x, badge_draw_y - 12),
                 "badge_exists": badge_is_present,
                 "badge_path": msg_layout_info["badge_path"],
                 "content_bottom_y": current_message_content_bottom_y,
