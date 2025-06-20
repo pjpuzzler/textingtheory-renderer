@@ -15,9 +15,7 @@ from pilmoji.source import AppleEmojiSource
 reddit = praw.Reddit(
     client_id=os.environ["REDDIT_CLIENT_ID"],
     client_secret=os.environ["REDDIT_SECRET"],
-    username=os.environ["REDDIT_USERNAME"],
-    password=os.environ["REDDIT_PASSWORD"],
-    user_agent="textingtheorybot",
+    user_agent="u/textingtheorybot pfp fetcher",
 )
 
 

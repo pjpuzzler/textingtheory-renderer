@@ -40,6 +40,8 @@ jobs:
 
       - name: Render image and Upload
         env:
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_SECRET: ${{ secrets.REDDIT_SECRET }}
           ALLTHEPICS_API_KEY: ${{ secrets.ALLTHEPICS_API_KEY }}
           RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }}
         run: |
