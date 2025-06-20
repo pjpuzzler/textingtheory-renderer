@@ -1,5 +1,6 @@
 import io
 import requests
+import praw
 import enum
 import json
 import os
@@ -9,6 +10,15 @@ from dataclasses import dataclass
 from PIL import Image, ImageDraw, ImageFont, ImageColor
 from pilmoji import Pilmoji
 from pilmoji.source import AppleEmojiSource
+
+
+reddit = praw.Reddit(
+    client_id=os.environ["REDDIT_CLIENT_ID"],
+    client_secret=os.environ["REDDIT_SECRET"],
+    username=os.environ["REDDIT_USERNAME"],
+    password=os.environ["REDDIT_PASSWORD"],
+    user_agent="textingtheorybot",
+)
 
 
 class Classification(enum.Enum):
@@ -60,7 +70,6 @@ class RedditComment:
     username: str
     content: str
     classification: Classification
-    icon_img: str
 
 
 def wrap_text(text, draw, font, max_width):
@@ -501,21 +510,13 @@ def render_reddit_chain(
     for idx, details in enumerate(message_draw_details):
         msg_obj = messages[idx]
 
-        if not msg_obj.icon_img:
+        try:
+            icon_url = reddit.redditor(msg_obj.username).icon_img
+            response = requests.get(icon_url)
+            response.raise_for_status()
+            avatar_source_img = Image.open(io.BytesIO(response.content)).convert("RGBA")
+        except:
             avatar_source_img = Image.new("RGBA", (AVATAR_SIZE, AVATAR_SIZE), "#888")
-        else:
-            try:
-                resp = requests.get(msg_obj.icon_img, timeout=5)
-                resp.raise_for_status()
-                avatar_source_img = Image.open(io.BytesIO(resp.content)).convert("RGBA")
-            except requests.exceptions.RequestException as e:
-                avatar_source_img = Image.new(
-                    "RGBA", (AVATAR_SIZE, AVATAR_SIZE), "#888"
-                )
-            except IOError:
-                avatar_source_img = Image.new(
-                    "RGBA", (AVATAR_SIZE, AVATAR_SIZE), "#888"
-                )
 
         hires_avatar_size = AVATAR_SIZE * 4
         hires_avatar = avatar_source_img.resize(
@@ -633,21 +634,6 @@ def upload_with_api(api_key, file_path, title=None, expiration=None):
             else:
                 print("Max retries reached. Giving up.")
                 return None
-
-
-def get_reddit_icon(username: str) -> str | None:
-    try:
-        response = requests.get(
-            f"https://www.reddit.com/user/{username}/about.json",
-            headers={"User-Agent": "RedditChainRenderer/0.1"},
-            timeout=5,
-        )
-        response.raise_for_status()
-        user_data = response.json()
-        return user_data.get("data", {}).get("icon_img")
-    except Exception as e:
-        print(f"Warning: Failed to fetch icon for user '{username}': {e}")
-        return None
 
 
 # --- CLI Main Function ---
@@ -768,14 +754,12 @@ def main():
                     )
                     continue
                 classification_enum = Classification(classification_str.lower())
-                icon_img_url = get_reddit_icon(msg_data["username"])
 
                 parsed_messages.append(
                     RedditComment(
                         username=msg_data["username"],
                         content=msg_data["content"],
                         classification=classification_enum,
-                        icon_img=icon_img_url,
                     )
                 )
             except ValueError:
