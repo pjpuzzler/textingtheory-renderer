@@ -60,7 +60,7 @@ class RedditComment:
     username: str
     content: str
     classification: Classification
-    snoovatar_url: str | None = None
+    icon_img: str
 
 
 def wrap_text(text, draw, font, max_width):
@@ -501,11 +501,11 @@ def render_reddit_chain(
     for idx, details in enumerate(message_draw_details):
         msg_obj = messages[idx]
 
-        if not msg_obj.snoovatar_url:
+        if not msg_obj.icon_img:
             avatar_source_img = Image.new("RGBA", (AVATAR_SIZE, AVATAR_SIZE), "#888")
         else:
             try:
-                resp = requests.get(msg_obj.snoovatar_url, timeout=5)
+                resp = requests.get(msg_obj.icon_img, timeout=5)
                 resp.raise_for_status()
                 avatar_source_img = Image.open(io.BytesIO(resp.content)).convert("RGBA")
             except requests.exceptions.RequestException as e:
@@ -758,7 +758,7 @@ def main():
                         username=msg_data["username"],
                         content=msg_data["content"],
                         classification=classification_enum,
-                        snoovatar_url=msg_data.get("snoovatarUrl", None),
+                        icon_img=msg_data["iconImg"],
                     )
                 )
             except ValueError:
