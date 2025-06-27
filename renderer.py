@@ -58,7 +58,7 @@ class TextMessage:
     side: str
     content: str
     classification: Classification
-    unsent: bool = False
+    # unsent: bool = False
     username: str = None
     avatar_url: str = None
 
@@ -226,63 +226,63 @@ def render_conversation(
         x1, y1 = x0 + bw, y + bh
         bubble_draw = ImageDraw.Draw(bubble_layer)
 
-        if m.unsent:
-            # ... (unsent bubble drawing logic - assuming it's correct) ...
-            if m.side == "left":
-                center_big = (x0 + 5 * scale, y1 - 5 * scale)
-                big_rad = 7 * scale
-                bbox_big = (
-                    center_big[0] - big_rad,
-                    center_big[1] - big_rad,
-                    center_big[0] + big_rad,
-                    center_big[1] + big_rad,
-                )
-                bubble_draw.ellipse(bbox_big, fill=bubble_color)
+        # if m.unsent:
+        #     # ... (unsent bubble drawing logic - assuming it's correct) ...
+        #     if m.side == "left":
+        #         center_big = (x0 + 5 * scale, y1 - 5 * scale)
+        #         big_rad = 7 * scale
+        #         bbox_big = (
+        #             center_big[0] - big_rad,
+        #             center_big[1] - big_rad,
+        #             center_big[0] + big_rad,
+        #             center_big[1] + big_rad,
+        #         )
+        #         bubble_draw.ellipse(bbox_big, fill=bubble_color)
 
-                center_small = (x0 - 3 * scale, y1 + 3 * scale)
-                small_rad = 3 * scale
-                bbox_small = (
-                    center_small[0] - small_rad,
-                    center_small[1] - small_rad,
-                    center_small[0] + small_rad,
-                    center_small[1] + small_rad,
-                )
-                bubble_draw.ellipse(bbox_small, fill=bubble_color)
-            else:
-                center_big = (x1 - 5 * scale, y1 - 5 * scale)
-                big_rad = 7 * scale
-                bbox_big = (
-                    center_big[0] - big_rad,
-                    center_big[1] - big_rad,
-                    center_big[0] + big_rad,
-                    center_big[1] + big_rad,
-                )
-                bubble_draw.ellipse(bbox_big, fill=bubble_color)
+        #         center_small = (x0 - 3 * scale, y1 + 3 * scale)
+        #         small_rad = 3 * scale
+        #         bbox_small = (
+        #             center_small[0] - small_rad,
+        #             center_small[1] - small_rad,
+        #             center_small[0] + small_rad,
+        #             center_small[1] + small_rad,
+        #         )
+        #         bubble_draw.ellipse(bbox_small, fill=bubble_color)
+        #     else:
+        #         center_big = (x1 - 5 * scale, y1 - 5 * scale)
+        #         big_rad = 7 * scale
+        #         bbox_big = (
+        #             center_big[0] - big_rad,
+        #             center_big[1] - big_rad,
+        #             center_big[0] + big_rad,
+        #             center_big[1] + big_rad,
+        #         )
+        #         bubble_draw.ellipse(bbox_big, fill=bubble_color)
 
-                center_small = (x1 + 3 * scale, y1 + 3 * scale)
-                small_rad = 3 * scale
-                bbox_small = (
-                    center_small[0] - small_rad,
-                    center_small[1] - small_rad,
-                    center_small[0] + small_rad,
-                    center_small[1] + small_rad,
-                )
-                bubble_draw.ellipse(bbox_small, fill=bubble_color)
+        #         center_small = (x1 + 3 * scale, y1 + 3 * scale)
+        #         small_rad = 3 * scale
+        #         bbox_small = (
+        #             center_small[0] - small_rad,
+        #             center_small[1] - small_rad,
+        #             center_small[0] + small_rad,
+        #             center_small[1] + small_rad,
+        #         )
+        #         bubble_draw.ellipse(bbox_small, fill=bubble_color)
+        # else:
+        if m.side == "left":
+            tail = [
+                (x0 + 2 * scale, y + bh - 16 * scale),
+                (x0 - 6 * scale, y + bh),
+                (x0 + 10 * scale, y + bh - 4 * scale),
+            ]
+            bubble_draw.polygon(tail, fill=bubble_color)
         else:
-            if m.side == "left":
-                tail = [
-                    (x0 + 2 * scale, y + bh - 16 * scale),
-                    (x0 - 6 * scale, y + bh),
-                    (x0 + 10 * scale, y + bh - 4 * scale),
-                ]
-                bubble_draw.polygon(tail, fill=bubble_color)
-            else:
-                tail = [
-                    (x1 - 2 * scale, y + bh - 16 * scale),
-                    (x1 + 6 * scale, y + bh),
-                    (x1 - 10 * scale, y + bh - 4 * scale),
-                ]
-                bubble_draw.polygon(tail, fill=bubble_color)
+            tail = [
+                (x1 - 2 * scale, y + bh - 16 * scale),
+                (x1 + 6 * scale, y + bh),
+                (x1 - 10 * scale, y + bh - 4 * scale),
+            ]
+            bubble_draw.polygon(tail, fill=bubble_color)
         bubble_draw.rounded_rectangle((x0, y, x1, y1), radius, fill=bubble_color)
 
         text_drawings.append(
@@ -674,7 +674,7 @@ def main():
                         side=msg_data["side"],
                         content=msg_data["content"],
                         classification=classification_enum,
-                        unsent=msg_data.get("unsent", False),
+                        # unsent=msg_data.get("unsent", False),
                     )
                 )
             except ValueError:
