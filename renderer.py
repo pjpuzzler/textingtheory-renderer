@@ -36,6 +36,7 @@ class Classification(enum.Enum):
     MEGABLUNDER = "megablunder"
     MISS = "miss"
     MISTAKE = "mistake"
+    PASS = "pass"
     RESIGN = "resign"
     SUPERBRILLIANT = "superbrilliant"
     TIMEOUT = "timeout"
