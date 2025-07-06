@@ -69,12 +69,27 @@ ICON_COLORS = {
     Classification.CHECKMATED: "#CE3C33",
     Classification.DRAW: "#312E2B",
     Classification.FORCED: "#9BAE8E",
-    Classification.INTERESTING: "",
+    Classification.INTERESTING: "#79799E",
     Classification.MISS: "#EE7F6F",
     Classification.RESIGN: "#CE3C33",
     Classification.TIMEOUT: "#CE3C33",
     Classification.WINNER: "#8EB75D",
 }
+
+NO_COLOR_ICONS = [
+    Classification.INACCURACY,
+    Classification.GOOD,
+    Classification.EXCELLENT,
+    Classification.BEST,
+    Classification.ABANDON,
+    Classification.CHECKMATED,
+    Classification.DRAW,
+    Classification.FORCED,
+    Classification.INTERESTING,
+    Classification.RESIGN,
+    Classification.TIMEOUT,
+    Classification.WINNER,
+]
 
 
 @dataclass
@@ -250,7 +265,11 @@ def render_conversation(
             text_hex = color_data_right["text_hex"]
 
         # Get classification color
-        classification_color_hex = ICON_COLORS.get(m.classification)
+        classification_color_hex = (
+            None
+            if m.classification in NO_COLOR_ICONS
+            else ICON_COLORS.get(m.classification)
+        )
 
         # Default to the base bubble color. This will be used if there's no
         # classification color or if a color string is invalid.
