@@ -82,6 +82,7 @@ NO_COLOR_ICONS = [
     Classification.EXCELLENT,
     Classification.BEST,
     Classification.ABANDON,
+    Classification.BOOK,
     Classification.CHECKMATED,
     Classification.DRAW,
     Classification.FORCED,
