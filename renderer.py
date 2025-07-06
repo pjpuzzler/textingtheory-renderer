@@ -54,6 +54,33 @@ class Classification(enum.Enum):
                 return os.path.join(base_path, f"{self.value}.png")
 
 
+ICON_COLORS = (
+    {
+        Classification.MEGABLUNDER: "#6C040C",
+        Classification.BLUNDER: "#FA412D",
+        Classification.MISTAKE: "#FFA459",
+        Classification.INACCURACY: "#F7C631",
+        Classification.GOOD: "#95B776",
+        Classification.EXCELLENT: "#80B64B",
+        Classification.BEST: "#80B64B",
+        Classification.GREAT: "#749BBF",
+        Classification.BRILLIANT: "#27C2A3",
+        Classification.SUPERBRILLIANT: "#E273E7",
+        Classification.ABANDON: "#CE3C33",
+        Classification.BOOK: "#CDA682",
+        Classification.CHECKMATED: "#CE3C33",
+        Classification.DRAW: "#312E2B",
+        Classification.FORCED: "#9BAE8E",
+        Classification.INTERESTING: "",
+        Classification.MISS: "#EE7F6F",
+        Classification.PASS: "#939393",
+        Classification.RESIGN: "#CE3C33",
+        Classification.TIMEOUT: "#CE3C33",
+        Classification.WINNER: "#8EB75D",
+    },
+)
+
+
 @dataclass
 class TextMessage:
     side: str
@@ -213,16 +240,41 @@ def render_conversation(
     for i, (m, txt, (w, h)) in enumerate(zip(messages, wrapped, dims)):
         bw = w + 2 * pad
         bh = h + 2 * pad
+
+        # Determine base colors and positioning based on side
         if m.side == "left":
             x0 = pad
             badge_x = x0 + bw - badge_sz + badge_margin
-            bubble_color = color_data_left["bubble_hex"]
+            base_bubble_hex = color_data_left["bubble_hex"]
             text_hex = color_data_left["text_hex"]
         else:
             x0 = img_w - bw - pad
             badge_x = x0 - badge_margin
-            bubble_color = color_data_right["bubble_hex"]
+            base_bubble_hex = color_data_right["bubble_hex"]
             text_hex = color_data_right["text_hex"]
+
+        # Get classification color
+        classification_color_hex = ICON_COLORS[0].get(m.classification)
+
+        # Default to the base bubble color
+        final_bubble_color = base_bubble_hex
+
+        # If a classification color exists, blend it 50/50 with the base color
+        if classification_color_hex:
+            try:
+                rgb1 = ImageColor.getrgb(base_bubble_hex)
+                rgb2 = ImageColor.getrgb(classification_color_hex)
+                final_bubble_color = (
+                    (rgb1[0] + rgb2[0]) // 2,
+                    (rgb1[1] + rgb2[1]) // 2,
+                    (rgb1[2] + rgb2[2]) // 2,
+                )
+            except (ValueError, TypeError):
+                # Fallback if color string is invalid (e.g., empty)
+                print(
+                    f"Warning: Could not parse color for {m.classification}. Using base color."
+                )
+                final_bubble_color = base_bubble_hex
 
         x1, y1 = x0 + bw, y + bh
         bubble_draw = ImageDraw.Draw(bubble_layer)
@@ -270,21 +322,23 @@ def render_conversation(
         #         )
         #         bubble_draw.ellipse(bbox_small, fill=bubble_color)
         # else:
+
+        # Drawing logic, using final_bubble_color
         if m.side == "left":
             tail = [
                 (x0 + 2 * scale, y + bh - 16 * scale),
                 (x0 - 6 * scale, y + bh),
                 (x0 + 10 * scale, y + bh - 4 * scale),
             ]
-            bubble_draw.polygon(tail, fill=bubble_color)
+            bubble_draw.polygon(tail, fill=final_bubble_color)
         else:
             tail = [
                 (x1 - 2 * scale, y + bh - 16 * scale),
                 (x1 + 6 * scale, y + bh),
                 (x1 - 10 * scale, y + bh - 4 * scale),
             ]
-            bubble_draw.polygon(tail, fill=bubble_color)
-        bubble_draw.rounded_rectangle((x0, y, x1, y1), radius, fill=bubble_color)
+            bubble_draw.polygon(tail, fill=final_bubble_color)
+        bubble_draw.rounded_rectangle((x0, y, x1, y1), radius, fill=final_bubble_color)
 
         text_drawings.append(
             (
