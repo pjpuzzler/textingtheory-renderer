@@ -54,31 +54,29 @@ class Classification(enum.Enum):
                 return os.path.join(base_path, f"{self.value}.png")
 
 
-ICON_COLORS = (
-    {
-        Classification.MEGABLUNDER: "#6C040C",
-        Classification.BLUNDER: "#FA412D",
-        Classification.MISTAKE: "#FFA459",
-        Classification.INACCURACY: "#F7C631",
-        Classification.GOOD: "#95B776",
-        Classification.EXCELLENT: "#80B64B",
-        Classification.BEST: "#80B64B",
-        Classification.GREAT: "#749BBF",
-        Classification.BRILLIANT: "#27C2A3",
-        Classification.SUPERBRILLIANT: "#E273E7",
-        Classification.ABANDON: "#CE3C33",
-        Classification.BOOK: "#CDA682",
-        Classification.CHECKMATED: "#CE3C33",
-        Classification.DRAW: "#312E2B",
-        Classification.FORCED: "#9BAE8E",
-        Classification.INTERESTING: "",
-        Classification.MISS: "#EE7F6F",
-        Classification.PASS: "#939393",
-        Classification.RESIGN: "#CE3C33",
-        Classification.TIMEOUT: "#CE3C33",
-        Classification.WINNER: "#8EB75D",
-    },
-)
+ICON_COLORS = {
+    Classification.MEGABLUNDER: "#6C040C",
+    Classification.BLUNDER: "#FA412D",
+    Classification.MISTAKE: "#FFA459",
+    Classification.INACCURACY: "#F7C631",
+    Classification.GOOD: "#95B776",
+    Classification.EXCELLENT: "#80B64B",
+    Classification.BEST: "#80B64B",
+    Classification.GREAT: "#749BBF",
+    Classification.BRILLIANT: "#27C2A3",
+    Classification.SUPERBRILLIANT: "#E273E7",
+    Classification.ABANDON: "#CE3C33",
+    Classification.BOOK: "#CDA682",
+    Classification.CHECKMATED: "#CE3C33",
+    Classification.DRAW: "#312E2B",
+    Classification.FORCED: "#9BAE8E",
+    Classification.INTERESTING: "",
+    Classification.MISS: "#EE7F6F",
+    Classification.PASS: "#939393",
+    Classification.RESIGN: "#CE3C33",
+    Classification.TIMEOUT: "#CE3C33",
+    Classification.WINNER: "#8EB75D",
+}
 
 
 @dataclass
@@ -254,27 +252,37 @@ def render_conversation(
             text_hex = color_data_right["text_hex"]
 
         # Get classification color
-        classification_color_hex = ICON_COLORS[0].get(m.classification)
+        classification_color_hex = ICON_COLORS.get(m.classification)
 
-        # Default to the base bubble color
+        # Default to the base bubble color. This will be used if there's no
+        # classification color or if a color string is invalid.
         final_bubble_color = base_bubble_hex
 
-        # If a classification color exists, blend it 50/50 with the base color
+        # If a classification color exists, blend it with the base color
+        # to simulate a 50% opacity overlay.
         if classification_color_hex:
             try:
-                rgb1 = ImageColor.getrgb(base_bubble_hex)
-                rgb2 = ImageColor.getrgb(classification_color_hex)
-                final_bubble_color = (
-                    (rgb1[0] + rgb2[0]) // 2,
-                    (rgb1[1] + rgb2[1]) // 2,
-                    (rgb1[2] + rgb2[2]) // 2,
+                # Get RGB tuples for the base bubble and the classification overlay
+                base_rgb = ImageColor.getrgb(base_bubble_hex)
+                overlay_rgb = ImageColor.getrgb(classification_color_hex)
+
+                # Alpha value for the overlay (50%)
+                alpha = 0.5
+
+                # Blend each channel: C_out = C_base * (1 - alpha) + C_overlay * alpha
+                # This simulates placing the classification color with 50% opacity over the base color.
+                blended_rgb = tuple(
+                    int(base_comp * (1 - alpha) + overlay_comp * alpha)
+                    for base_comp, overlay_comp in zip(base_rgb, overlay_rgb)
                 )
+                final_bubble_color = blended_rgb
             except (ValueError, TypeError):
-                # Fallback if color string is invalid (e.g., empty)
+                # Fallback for invalid color strings (e.g., empty string for 'interesting')
                 print(
                     f"Warning: Could not parse color for {m.classification}. Using base color."
                 )
-                final_bubble_color = base_bubble_hex
+                # final_bubble_color remains base_bubble_hex as set by default
+                pass
 
         x1, y1 = x0 + bw, y + bh
         bubble_draw = ImageDraw.Draw(bubble_layer)
