@@ -36,7 +36,6 @@ class Classification(enum.Enum):
     MEGABLUNDER = "megablunder"
     MISS = "miss"
     MISTAKE = "mistake"
-    PASS = "pass"
     RESIGN = "resign"
     SUPERBRILLIANT = "superbrilliant"
     TIMEOUT = "timeout"
@@ -72,7 +71,6 @@ ICON_COLORS = {
     Classification.FORCED: "#9BAE8E",
     Classification.INTERESTING: "",
     Classification.MISS: "#EE7F6F",
-    Classification.PASS: "#939393",
     Classification.RESIGN: "#CE3C33",
     Classification.TIMEOUT: "#CE3C33",
     Classification.WINNER: "#8EB75D",
