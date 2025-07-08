@@ -41,15 +41,24 @@ jobs:
         run: |
           python renderer.py ${{ github.event.inputs.command }} ${{ github.event.inputs.uid }}
 
-      - name: Commit and push image to image-hosting branch
+      - name: Commit and push clean image to image-hosting branch
         run: |
+          # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # 1. Create a new orphan branch. The working dir is still full of old repo files.
           git checkout --orphan image-hosting-temp
 
+          # 2. Stage ONLY our new image. It is now "tracked" by git, so it's safe.
           git add --force ${{ github.event.inputs.uid }}.png
 
+          # 3. This is the key: Forcefully remove all OTHER untracked files and directories.
+          # Because our image is already staged (tracked), it will be spared.
+          git clean -fdx
+
+          # 4. Commit the single file that remains.
           git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
 
+          # 5. Force-push this clean, single-file commit to the remote.
           git push --force origin HEAD:image-hosting
