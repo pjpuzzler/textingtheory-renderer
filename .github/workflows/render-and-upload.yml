@@ -49,17 +49,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Switch to the hosting branch
-          git fetch
-          git checkout image-hosting
+          # Fetch all remote branches
+          git fetch origin
 
-          # Add the generated image. Note: The image was created in the root
-          # of the repo in the previous step, so we can just add it.
+          # This is the key change.
+          # Explicitly create/reset a local 'image-hosting' branch to match the remote.
+          # This is more robust than a simple `git checkout`.
+          git checkout -B image-hosting origin/image-hosting
+
+          # Add the generated image.
           git add ${{ github.event.inputs.uid }}.png
 
           # Commit the new image
           git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
 
-          # Force push to overwrite the branch's history
-          # This keeps the branch from growing in size
+          # Force push. This will now correctly update the branch head.
           git push --force origin image-hosting
