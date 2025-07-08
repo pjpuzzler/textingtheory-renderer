@@ -49,17 +49,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 1. Create a new orphan branch with NO history. This is a clean slate.
-          git checkout --orphan temp_branch
+          # Create a new orphan branch to start with a clean history
+          git checkout --orphan image-hosting-temp
 
-          # 2. Add our newly rendered image.
-          git add ${{ github.event.inputs.uid }}.png
+          # This is the key step. Add ONLY the specific image file we just created.
+          # The --force flag is needed in case a .gitignore from the main branch
+          # somehow excludes .png files (unlikely, but this makes it robust).
+          git add --force ${{ github.event.inputs.uid }}.png
 
-          # 3. Create the one and only commit for this branch.
+          # Create the single commit containing only our image
           git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
 
-          # 4. Rename the local branch to match our target branch name.
-          git branch -M temp_branch image-hosting
-
-          # 5. Force-push this single-commit branch to GitHub, overwriting whatever was there before.
-          git push --force origin image-hosting
+          # Force-push this single-commit branch to the remote image-hosting branch,
+          # completely replacing whatever was there before.
+          git push --force origin HEAD:image-hosting
