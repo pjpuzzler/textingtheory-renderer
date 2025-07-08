@@ -49,18 +49,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Fetch all remote branches
-          git fetch origin
+          # 1. Create a new orphan branch with NO history. This is a clean slate.
+          git checkout --orphan temp_branch
 
-          # Add the --force (-f) flag to the checkout command
-          # This will discard the conflicting state from the initial checkout.
-          git checkout -f -B image-hosting origin/image-hosting
-
-          # Add the generated image.
+          # 2. Add our newly rendered image.
           git add ${{ github.event.inputs.uid }}.png
 
-          # Commit the new image
+          # 3. Create the one and only commit for this branch.
           git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
 
-          # Force push.
+          # 4. Rename the local branch to match our target branch name.
+          git branch -M temp_branch image-hosting
+
+          # 5. Force-push this single-commit branch to GitHub, overwriting whatever was there before.
           git push --force origin image-hosting
