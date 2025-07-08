@@ -10,40 +10,53 @@ on:
         description: "The JSON data for the renderer script."
         required: true
       command:
-        description: "The command to run (render_and_upload or render_and_upload_reddit_chain)."
+        description: "The command to run."
         required: true
         default: "render_and_upload"
 
 jobs:
-  render-and-upload:
+  render-and-commit:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout code from main branch
         uses: actions/checkout@v4
+        # This checks out your main branch to get the renderer script
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-python-3.11-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-python-3.11-pip-
-
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Render image and Upload
+      - name: Render image locally
         env:
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_SECRET: ${{ secrets.REDDIT_SECRET }}
-          ALLTHEPICS_API_KEY: ${{ secrets.ALLTHEPICS_API_KEY }}
           RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }}
         run: |
-          # The payload_filepath argument is removed from the script call
+          # The script now only generates the file, it doesn't upload.
           python renderer.py ${{ github.event.inputs.command }} ${{ github.event.inputs.uid }}
+
+      - name: Commit and push image to image-hosting branch
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Switch to the hosting branch
+          git fetch
+          git checkout image-hosting
+
+          # Add the generated image. Note: The image was created in the root
+          # of the repo in the previous step, so we can just add it.
+          git add ${{ github.event.inputs.uid }}.png
+
+          # Commit the new image
+          git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
+
+          # Force push to overwrite the branch's history
+          # This keeps the branch from growing in size
+          git push --force origin image-hosting
