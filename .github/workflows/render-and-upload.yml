@@ -24,7 +24,6 @@ jobs:
     steps:
       - name: Checkout code from main branch
         uses: actions/checkout@v4
-        # This checks out your main branch to get the renderer script
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
@@ -40,26 +39,17 @@ jobs:
           REDDIT_SECRET: ${{ secrets.REDDIT_SECRET }}
           RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }}
         run: |
-          # The script now only generates the file, it doesn't upload.
           python renderer.py ${{ github.event.inputs.command }} ${{ github.event.inputs.uid }}
 
       - name: Commit and push image to image-hosting branch
         run: |
-          # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Create a new orphan branch to start with a clean history
           git checkout --orphan image-hosting-temp
 
-          # This is the key step. Add ONLY the specific image file we just created.
-          # The --force flag is needed in case a .gitignore from the main branch
-          # somehow excludes .png files (unlikely, but this makes it robust).
           git add --force ${{ github.event.inputs.uid }}.png
 
-          # Create the single commit containing only our image
           git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
 
-          # Force-push this single-commit branch to the remote image-hosting branch,
-          # completely replacing whatever was there before.
           git push --force origin HEAD:image-hosting
