@@ -52,10 +52,9 @@ jobs:
           # Fetch all remote branches
           git fetch origin
 
-          # This is the key change.
-          # Explicitly create/reset a local 'image-hosting' branch to match the remote.
-          # This is more robust than a simple `git checkout`.
-          git checkout -B image-hosting origin/image-hosting
+          # Add the --force (-f) flag to the checkout command
+          # This will discard the conflicting state from the initial checkout.
+          git checkout -f -B image-hosting origin/image-hosting
 
           # Add the generated image.
           git add ${{ github.event.inputs.uid }}.png
@@ -63,5 +62,5 @@ jobs:
           # Commit the new image
           git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
 
-          # Force push. This will now correctly update the branch head.
+          # Force push.
           git push --force origin image-hosting
