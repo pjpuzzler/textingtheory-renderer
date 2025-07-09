@@ -668,11 +668,15 @@ def upload_with_api(api_key, file_path, title=None, expiration=None):
     api_url = "https://allthepics.net/api/1/upload"
     headers = {"X-API-Key": api_key}
 
-    data = {}
+    # --- CHANGE IS HERE ---
+    # Instead of a 'data' dictionary for the body, we use a 'params' dictionary
+    # which requests will append to the URL as a query string.
+    params = {}
     if title:
-        data["title"] = title
+        params["title"] = title
     if expiration:
-        data["expiration"] = expiration
+        params["expiration"] = expiration
+    # --- END OF CHANGE ---
 
     max_retries = 3
     for attempt in range(1, max_retries + 1):
@@ -680,18 +684,28 @@ def upload_with_api(api_key, file_path, title=None, expiration=None):
             with open(file_path, "rb") as f:
                 files = {"source": f}
                 print(
-                    f"Uploading '{os.path.basename(file_path)}' to image host with title '{title}'... (Attempt {attempt})"
+                    f"Uploading '{os.path.basename(file_path)}' to image host... (Attempt {attempt})"
                 )
 
+                # --- CHANGE IS HERE ---
+                # We now pass 'params=params' instead of 'data=data'.
+                # The 'files' argument remains the same.
                 response = requests.post(
-                    api_url, headers=headers, data=data, files=files
+                    api_url, headers=headers, params=params, files=files
                 )
+                # --- END OF CHANGE ---
+
                 response.raise_for_status()
                 json_response = response.json()
 
                 if json_response.get("status_code") == 200:
                     print("Upload successful!")
                     image_info = json_response.get("image", {})
+                    # You can verify the expiration was received by checking the response
+                    if image_info.get("expiration_date_gmt"):
+                        print(
+                            f"Image expiration set to: {image_info['expiration_date_gmt']}"
+                        )
                     return {
                         "image_url": image_info.get("url"),
                         "delete_url": image_info.get("delete_url"),
