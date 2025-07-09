@@ -57,11 +57,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 5. Add and commit the single image file.
+          # 5. Add and commit the single image file. This creates the 'master' branch.
           git add .
           git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
 
-          # 6. Force-push this new repo's main branch to the target repo's image-hosting branch.
-          # This completely overwrites the remote branch with our new, single-file commit.
-          # We use the GITHUB_TOKEN for authentication.
+          # 6. THIS IS THE FIX: Rename the local branch from 'master' to 'main'.
+          git branch -m master main
+
+          # 7. Force-push this new repo's 'main' branch to the target repo's image-hosting branch.
           git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main:image-hosting
