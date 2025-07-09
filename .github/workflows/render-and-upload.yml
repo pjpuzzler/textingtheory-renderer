@@ -41,30 +41,27 @@ jobs:
         run: |
           python renderer.py ${{ github.event.inputs.command }} ${{ github.event.inputs.uid }}
 
-      - name: Commit and push image to image-hosting branch
+      - name: Commit and push clean image to image-hosting branch
         run: |
-          # Configure git
+          # 1. Create a new, empty directory to act as our clean room.
+          mkdir deploy_directory
+
+          # 2. Move ONLY our rendered image into this clean directory.
+          mv ${{ github.event.inputs.uid }}.png deploy_directory/
+
+          # 3. Enter the clean directory.
+          cd deploy_directory
+
+          # 4. Initialize a brand new, temporary git repository inside this folder.
+          git init
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # 1. The image file exists. Move it to a temporary, safe location outside the repo directory.
-          mv ${{ github.event.inputs.uid }}.png /tmp/image.png
-
-          # 2. Create a new orphan branch. The working dir is still full of old repo files.
-          git checkout --orphan image-hosting-temp
-
-          # 3. This is the key: Wipe the working directory and the git index completely.
-          # We are now in a truly empty directory.
-          git reset --hard
-
-          # 4. Move our image back from the safe location into the now-empty directory.
-          mv /tmp/image.png ./${{ github.event.inputs.uid }}.png
-
-          # 5. Add ONLY the image file to the commit.
-          git add ${{ github.event.inputs.uid }}.png
-
-          # 6. Commit the single file.
+          # 5. Add and commit the single image file.
+          git add .
           git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
 
-          # 7. Force-push this clean, single-file commit to the remote.
-          git push --force origin HEAD:image-hosting
+          # 6. Force-push this new repo's main branch to the target repo's image-hosting branch.
+          # This completely overwrites the remote branch with our new, single-file commit.
+          # We use the GITHUB_TOKEN for authentication.
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main:image-hosting
