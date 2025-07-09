@@ -10,19 +10,16 @@ on:
         description: "The JSON data for the renderer script."
         required: true
       command:
-        description: "The command to run."
+        description: "The command to run (render_and_upload or render_and_upload_reddit_chain)."
         required: true
         default: "render_and_upload"
 
 jobs:
-  render-and-commit:
+  render-and-upload:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-
     steps:
-      - name: Checkout code from main branch
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python 3.11
@@ -30,39 +27,22 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-python-3.11-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-python-3.11-pip-
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Render image locally
+      - name: Render image and Upload
         env:
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_SECRET: ${{ secrets.REDDIT_SECRET }}
+          ALLTHEPICS_API_KEY: ${{ secrets.ALLTHEPICS_API_KEY }}
           RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }}
         run: |
           python renderer.py ${{ github.event.inputs.command }} ${{ github.event.inputs.uid }}
-
-      - name: Commit and push clean image to image-hosting branch
-        run: |
-          # 1. Create a new, empty directory to act as our clean room.
-          mkdir deploy_directory
-
-          # 2. Move ONLY our rendered image into this clean directory.
-          mv ${{ github.event.inputs.uid }}.png deploy_directory/
-
-          # 3. Enter the clean directory.
-          cd deploy_directory
-
-          # 4. Initialize a brand new, temporary git repository inside this folder.
-          git init
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # 5. Add and commit the single image file. This creates the 'master' branch.
-          git add .
-          git commit -m "feat: Add rendered image ${{ github.event.inputs.uid }}.png"
-
-          # 6. THIS IS THE FIX: Rename the local branch from 'master' to 'main'.
-          git branch -m master main
-
-          # 7. Force-push this new repo's 'main' branch to the target repo's image-hosting branch.
-          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main:image-hosting

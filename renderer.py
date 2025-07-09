@@ -656,6 +656,64 @@ def render_reddit_chain(
     print(f"Reddit chain image saved to {output_path}")
 
 
+def upload_with_api(api_key, file_path, title=None, expiration=None):
+    """
+    Uploads an image to allthepics.net using their official V1 API.
+    Retries up to 3 times if a network or API error occurs.
+    """
+    if not os.path.exists(file_path):
+        print(f"Error: File not found at '{file_path}'")
+        return None
+
+    api_url = "https://allthepics.net/api/1/upload"
+    headers = {"X-API-Key": api_key}
+
+    data = {}
+    if title:
+        data["title"] = title
+    if expiration:
+        data["expiration"] = expiration
+
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            with open(file_path, "rb") as f:
+                files = {"source": f}
+                print(
+                    f"Uploading '{os.path.basename(file_path)}' to image host with title '{title}'... (Attempt {attempt})"
+                )
+
+                response = requests.post(
+                    api_url, headers=headers, data=data, files=files
+                )
+                response.raise_for_status()
+                json_response = response.json()
+
+                if json_response.get("status_code") == 200:
+                    print("Upload successful!")
+                    image_info = json_response.get("image", {})
+                    return {
+                        "image_url": image_info.get("url"),
+                        "delete_url": image_info.get("delete_url"),
+                    }
+                else:
+                    error_message = json_response.get("error", {}).get(
+                        "message", "Unknown API error"
+                    )
+                    print(f"API Error: {error_message}")
+                    return None
+        except requests.exceptions.RequestException as e:
+            print(f"A network or API error occurred: {e}")
+            if attempt < max_retries:
+                print(
+                    f"Retrying in 2 seconds... (Attempt {attempt + 1} of {max_retries})"
+                )
+                time.sleep(2)
+            else:
+                print("Max retries reached. Giving up.")
+                return None
+
+
 # --- CLI Main Function ---
 def main():
     _, command, uid = sys.argv
@@ -668,12 +726,15 @@ def main():
     try:
         payload = json.loads(payload_json_string)
     except json.JSONDecodeError as e:
-        print(f"Error parsing JSON: {e}")
+        print(f"Error parsing JSON from RENDER_PAYLOAD_JSON environment variable: {e}")
+        print(
+            f"Received string: {payload_json_string[:500]}..."
+        )  # Print first 500 chars for debugging
         sys.exit(1)
 
     local_output_path = f"{uid}.png"
-    print(f"Executing command: {command} for UID: {uid}")
-    print(f"Rendering image to local file: {local_output_path}")
+
+    print(f"Executing command: {command} for replying to: {uid}")
 
     if command == "render_and_upload":
         print(f"Rendering image to temporary file: {local_output_path}")
@@ -693,7 +754,6 @@ def main():
                         side=msg_data["side"],
                         content=msg_data["content"],
                         classification=classification_enum,
-                        # unsent=msg_data.get("unsent", False),
                     )
                 )
             except ValueError:
@@ -719,8 +779,46 @@ def main():
             background_hex,
             local_output_path,
         )
+        print("Image rendered successfully.")
+
+        try:
+            api_key = os.environ.get("ALLTHEPICS_API_KEY")
+            if not api_key:
+                print("Error: ALLTHEPICS_API_KEY environment variable not set.")
+                if os.path.exists(local_output_path):
+                    os.remove(local_output_path)
+                sys.exit(1)
+
+            upload_result = upload_with_api(
+                api_key, local_output_path, title=uid, expiration="PT5M"
+            )
+
+            if not upload_result or not upload_result.get("image_url"):
+                print("Failed to upload image to host. Aborting.")
+                if os.path.exists(local_output_path):
+                    os.remove(local_output_path)
+                sys.exit(1)
+
+            image_url = upload_result["image_url"]
+            print(f"Image available at: {image_url}")
+        except Exception as e:
+            print(f"An error occurred during uploading: {e}")
+            import traceback
+
+            traceback.print_exc()
+            if os.path.exists(local_output_path):
+                os.remove(local_output_path)
+            sys.exit(1)
+        finally:
+            if os.path.exists(local_output_path):
+                try:
+                    os.remove(local_output_path)
+                    print(f"Cleaned up temporary file: {local_output_path}")
+                except Exception as e_remove:
+                    print(
+                        f"Error cleaning up temporary file {local_output_path}: {e_remove}"
+                    )
     elif command == "render_and_upload_reddit_chain":
-        print(payload)
         print(f"Rendering image to temporary file: {local_output_path}")
 
         parsed_messages = []
@@ -756,13 +854,48 @@ def main():
             parsed_messages,
             local_output_path,
         )
+        print("Image rendered successfully.")
+
+        try:
+            api_key = os.environ.get("ALLTHEPICS_API_KEY")
+            if not api_key:
+                print("Error: ALLTHEPICS_API_KEY environment variable not set.")
+                if os.path.exists(local_output_path):
+                    os.remove(local_output_path)
+                sys.exit(1)
+
+            upload_result = upload_with_api(
+                api_key, local_output_path, title=uid, expiration="PT5M"
+            )
+
+            if not upload_result or not upload_result.get("image_url"):
+                print("Failed to upload image to host. Aborting.")
+                if os.path.exists(local_output_path):
+                    os.remove(local_output_path)
+                sys.exit(1)
+
+            image_url = upload_result["image_url"]
+            print(f"Image available at: {image_url}")
+        except Exception as e:
+            print(f"An error occurred during uploading: {e}")
+            import traceback
+
+            traceback.print_exc()
+            if os.path.exists(local_output_path):
+                os.remove(local_output_path)
+            sys.exit(1)
+        finally:
+            if os.path.exists(local_output_path):
+                try:
+                    os.remove(local_output_path)
+                    print(f"Cleaned up temporary file: {local_output_path}")
+                except Exception as e_remove:
+                    print(
+                        f"Error cleaning up temporary file {local_output_path}: {e_remove}"
+                    )
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
-
-    print(
-        f"Image rendered successfully to {local_output_path}. GitHub Action will handle the commit."
-    )
 
 
 if __name__ == "__main__":
