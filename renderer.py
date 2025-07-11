@@ -350,20 +350,21 @@ def render_conversation(
         # else:
 
         # Drawing logic, using final_bubble_color
-        if m.side == "left":
-            tail = [
-                (x0 + 2 * scale, y + bh - 16 * scale),
-                (x0 - 6 * scale, y + bh),
-                (x0 + 10 * scale, y + bh - 4 * scale),
-            ]
-            bubble_draw.polygon(tail, fill=final_bubble_color)
-        else:
-            tail = [
-                (x1 - 2 * scale, y + bh - 16 * scale),
-                (x1 + 6 * scale, y + bh),
-                (x1 - 10 * scale, y + bh - 4 * scale),
-            ]
-            bubble_draw.polygon(tail, fill=final_bubble_color)
+        if i == len(messages) - 1 or messages[i + 1].side != m.side:
+            if m.side == "left":
+                tail = [
+                    (x0 + 2 * scale, y + bh - 16 * scale),
+                    (x0 - 6 * scale, y + bh),
+                    (x0 + 10 * scale, y + bh - 4 * scale),
+                ]
+                bubble_draw.polygon(tail, fill=final_bubble_color)
+            else:
+                tail = [
+                    (x1 - 2 * scale, y + bh - 16 * scale),
+                    (x1 + 6 * scale, y + bh),
+                    (x1 - 10 * scale, y + bh - 4 * scale),
+                ]
+                bubble_draw.polygon(tail, fill=final_bubble_color)
         bubble_draw.rounded_rectangle((x0, y, x1, y1), radius, fill=final_bubble_color)
 
         text_drawings.append(
