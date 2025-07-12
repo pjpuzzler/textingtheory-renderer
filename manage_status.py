@@ -50,8 +50,8 @@ def set_monday_status():
                     {"e": "u/", "t": "textingtheorybot", "l": False},
                     {
                         "e": "text",
-                        "t": " has the ability to give Megablunder classifications",
-                        "f": [[2, 25, 11]],
+                        "t": " can give Megablunder classifications",
+                        "f": [[2, 10, 11]],
                     },
                 ],
             },
@@ -85,8 +85,8 @@ def set_saturday_status():
                     {"e": "u/", "t": "textingtheorybot", "l": False},
                     {
                         "e": "text",
-                        "t": " has the ability to give Superbrilliant classifications",
-                        "f": [[2, 25, 14]],
+                        "t": " can give Superbrilliant classifications",
+                        "f": [[2, 10, 14]],
                     },
                 ],
             },
