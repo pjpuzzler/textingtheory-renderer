@@ -1,18 +1,8 @@
 name: Render and Upload Image
 
 on:
-  workflow_dispatch:
-    inputs:
-      uid:
-        description: "The UID to use for the filename."
-        required: true
-      render_payload:
-        description: "The JSON data for the renderer script."
-        required: true
-      command:
-        description: "The command to run (render_and_upload or render_and_upload_reddit_chain)."
-        required: true
-        default: "render_and_upload"
+  repository_dispatch:
+    types: [render_and_upload, render_and_upload_reddit_chain]
 
 jobs:
   render-and-upload:
@@ -43,6 +33,10 @@ jobs:
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_SECRET: ${{ secrets.REDDIT_SECRET }}
           ALLTHEPICS_API_KEY: ${{ secrets.ALLTHEPICS_API_KEY }}
-          RENDER_PAYLOAD_JSON: ${{ github.event.inputs.render_payload }}
+          # The payload is now at github.event.client_payload.render_payload
+          # We use toJSON() to convert the JSON object to a string for the env var
+          RENDER_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload.render_payload) }}
         run: |
-          python renderer.py ${{ github.event.inputs.command }} ${{ github.event.inputs.uid }}
+          # The command is github.event.action (the event_type from the dispatch)
+          # The UID is in the client_payload
+          python renderer.py ${{ github.event.action }} ${{ github.event.client_payload.uid }}
