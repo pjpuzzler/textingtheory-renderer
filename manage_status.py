@@ -22,7 +22,6 @@ def get_reddit_instance():
         client_secret=os.getenv("REDDIT_SECRET"),
         user_agent=USER_AGENT,
         refresh_token=refresh_token,
-        # requestor_kwargs={'session': requests.Session()} # Optional: For advanced proxy/header use
     )
     print("Successfully initialized PRAW Reddit instance.")
     return reddit
@@ -33,14 +32,11 @@ def update_community_status(reddit, payload, action_description):
     """Sends the API request using PRAW's authenticated session."""
     print(f"Sending request to {action_description} using PRAW's session...")
     try:
-        # Let PRAW handle the entire request. It will automatically include
-        # the necessary Authorization and x-csrf-token headers.
-        # We pass the payload directly using the `json` parameter.
+        # Let PRAW handle the entire request, including all authentication.
         response = reddit.post(GRAPHQL_URL, json=payload)
 
-        # GraphQL responses don't typically raise HTTP errors for bad
-        # requests, they return a 200 OK with an 'errors' key.
-        if "errors" in response and response["errors"]:
+        # Check for GraphQL-specific errors within a successful (200 OK) response
+        if isinstance(response, dict) and "errors" in response and response["errors"]:
             raise prawcore.exceptions.PrawcoreException(
                 f"GraphQL returned errors: {response['errors']}"
             )
@@ -54,7 +50,6 @@ def update_community_status(reddit, payload, action_description):
 
 
 # --- Action-specific Functions ---
-# Note: The 'csrf_token' is no longer needed in these payloads
 def set_monday_status(reddit):
     """Builds and sends the 'Megablunder Monday' status payload."""
     rich_text = {
@@ -82,7 +77,8 @@ def set_monday_status(reddit):
             "input": {
                 "subredditId": SUBREDDIT_ID,
                 "emojiId": "megablunder",
-                "description": {"richText": json.dumps(rich_text)},
+                # THE FIX: Pass the dictionary directly. Do not use json.dumps().
+                "description": {"richText": rich_text},
             }
         },
     }
@@ -116,7 +112,8 @@ def set_saturday_status(reddit):
             "input": {
                 "subredditId": SUBREDDIT_ID,
                 "emojiId": "superbrilliant",
-                "description": {"richText": json.dumps(rich_text)},
+                # THE FIX: Pass the dictionary directly. Do not use json.dumps().
+                "description": {"richText": rich_text},
             }
         },
     }
