@@ -20,7 +20,7 @@ def get_reddit_instance():
 
     reddit = praw.Reddit(
         client_id=os.getenv("REDDIT_CLIENT_ID"),
-        client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
+        client_secret=os.getenv("REDDIT_SECRET"),
         user_agent=USER_AGENT,
         # No need for username/password when using a refresh token for script auth
         refresh_token=refresh_token,
