@@ -24,11 +24,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
-      REDDIT_SECRET: ${{ secrets.REDDIT_SECRET }}
+      # Use username and password secrets
       REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
       REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
-      REDDIT_REFRESH_TOKEN: ${{ secrets.REDDIT_REFRESH_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -39,8 +37,11 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install dependencies
-        run: pip install praw requests
+      - name: Install Python dependencies
+        run: pip install playwright
+
+      - name: Install Playwright browsers and dependencies
+        run: playwright install --with-deps chromium
 
       - name: Set Monday Status
         if: github.event.schedule == '0 4 * * 1' || github.event.inputs.action == 'set-monday'
