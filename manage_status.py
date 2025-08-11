@@ -3,6 +3,7 @@ import sys
 import json
 import praw
 import prawcore
+import requests  # We are using the requests library again for direct control
 
 # --- Configuration ---
 SUBREDDIT_ID = "t5_4kth6i"
@@ -29,28 +30,46 @@ def get_reddit_instance():
 
 # --- Helper Function ---
 def update_community_status(reddit, payload, action_description):
-    """Sends the API request using PRAW's authenticated session."""
-    print(f"Sending request to {action_description}...")
+    """
+    Uses PRAW to get an access token, then sends the request manually
+    using the 'requests' library for maximum reliability.
+    """
+    print(f"Sending request to {action_description} via requests library...")
     try:
-        # PRAW's post method handles all authentication, including access and CSRF tokens.
-        response = reddit.post(GRAPHQL_URL, json=payload)
+        # Step 1: Get the access token from the authenticated PRAW instance.
+        # This is the only thing we will use PRAW for in this function.
+        access_token = reddit._core._authorizer.access_token
+        if not access_token:
+            raise ValueError("Could not get access token from PRAW.")
 
-        if isinstance(response, dict) and "errors" in response and response["errors"]:
-            raise prawcore.exceptions.PrawcoreException(
-                f"GraphQL returned errors: {response['errors']}"
-            )
+        # Step 2: Build the headers for the manual request.
+        # OAuth (Bearer) authentication does not require a CSRF token in the headers.
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "User-Agent": USER_AGENT,
+            "Content-Type": "application/json",
+            "origin": "https://www.reddit.com",  # Including these helps mimic a browser
+            "referer": "https://www.reddit.com/",
+        }
 
-        print(f"Status: SUCCESS\nResponse: {response}")
+        # Step 3: Make the API call using 'requests'.
+        response = requests.post(GRAPHQL_URL, headers=headers, json=payload)
+        response.raise_for_status()  # This will raise an error for 4xx or 5xx responses
+
+        response_json = response.json()
+        if "errors" in response_json and response_json["errors"]:
+            raise Exception(f"GraphQL returned errors: {response_json['errors']}")
+
+        print(f"Status: SUCCESS\nResponse: {json.dumps(response_json, indent=2)}")
         print(f"\n✅ SUCCESS! {action_description} completed.")
 
-    except prawcore.exceptions.BadRequest as e:
-        # Provide detailed error feedback if the server rejects the data.
-        print("\n❌ FAILED! The server returned a 400 Bad Request.")
-        print("   This means authentication worked, but the data payload was invalid.")
-        print(f"\n--- SERVER RESPONSE ---\n{e.response.text}\n-----------------------")
+    except requests.RequestException as e:
+        print(f"\n❌ FAILED! A network error occurred: {e}")
+        if e.response is not None:
+            print(f"Server responded with {e.response.status_code}:\n{e.response.text}")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ FAILED! An unexpected error occurred: {e}")
+        print(f"\n❌ FAILED! A general error occurred: {e}")
         sys.exit(1)
 
 
@@ -76,19 +95,16 @@ def set_monday_status(reddit):
             },
         ]
     }
-
-    # The `variables` for this specific endpoint must be a JSON string.
-    variables = {
-        "input": {
-            "subredditId": SUBREDDIT_ID,
-            "emojiId": "megablunder",
-            "description": {"richText": json.dumps(rich_text)},
-        }
-    }
-
     payload = {
         "operation": "UpdateCommunityStatus",
-        "variables": json.dumps(variables),  # This is the key fix.
+        "variables": {
+            "input": {
+                "subredditId": SUBREDDIT_ID,
+                "emojiId": "megablunder",
+                "description": {"richText": json.dumps(rich_text)},
+            }
+        },
+        # NOTE: A CSRF token is not needed in the body when using Bearer auth.
     }
     update_community_status(reddit, payload, "SET Monday status")
 
@@ -114,31 +130,24 @@ def set_saturday_status(reddit):
             },
         ]
     }
-
-    # The `variables` for this specific endpoint must be a JSON string.
-    variables = {
-        "input": {
-            "subredditId": SUBREDDIT_ID,
-            "emojiId": "superbrilliant",
-            "description": {"richText": json.dumps(rich_text)},
-        }
-    }
-
     payload = {
         "operation": "UpdateCommunityStatus",
-        "variables": json.dumps(variables),  # This is the key fix.
+        "variables": {
+            "input": {
+                "subredditId": SUBREDDIT_ID,
+                "emojiId": "superbrilliant",
+                "description": {"richText": json.dumps(rich_text)},
+            }
+        },
     }
     update_community_status(reddit, payload, "SET Saturday status")
 
 
 def clear_status(reddit):
     """Builds and sends the payload to clear the community status."""
-    # The `variables` for this specific endpoint must be a JSON string.
-    variables = {"input": {"subredditId": SUBREDDIT_ID, "emojiId": ""}}
-
     payload = {
         "operation": "UpdateCommunityStatus",
-        "variables": json.dumps(variables),  # This is the key fix.
+        "variables": {"input": {"subredditId": SUBREDDIT_ID, "emojiId": ""}},
     }
     update_community_status(reddit, payload, "CLEAR community status")
 
@@ -150,7 +159,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        # Note: A refresh token with 'modconfig' scope is sufficient.
+        # A refresh token with just 'modconfig' scope is sufficient.
         reddit_instance = get_reddit_instance()
     except (ValueError, prawcore.exceptions.PrawcoreException) as e:
         print(f"❌ FAILED to authenticate with Reddit: {e}")
