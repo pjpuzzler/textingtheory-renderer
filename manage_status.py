@@ -29,13 +29,15 @@ def get_reddit_instance():
 
 # --- Helper Function ---
 def update_community_status(reddit, payload, action_description):
-    """Sends the API request using PRAW's authenticated session."""
+    """Sends the API request using PRAW's authenticated session and provides detailed error reporting."""
     print(f"Sending request to {action_description} using PRAW's session...")
+
+    # DEBUG: Print the exact payload being sent for review.
+    print(f"Payload being sent:\n{json.dumps(payload, indent=2)}")
+
     try:
-        # Let PRAW handle the entire request, including all authentication.
         response = reddit.post(GRAPHQL_URL, json=payload)
 
-        # Check for GraphQL-specific errors within a successful (200 OK) response
         if isinstance(response, dict) and "errors" in response and response["errors"]:
             raise prawcore.exceptions.PrawcoreException(
                 f"GraphQL returned errors: {response['errors']}"
@@ -44,8 +46,20 @@ def update_community_status(reddit, payload, action_description):
         print(f"Status: SUCCESS\nResponse: {response}")
         print(f"\n✅ SUCCESS! {action_description} completed.")
 
+    except prawcore.exceptions.BadRequest as e:
+        # THIS IS THE CRITICAL DIAGNOSTIC STEP
+        print(
+            "\n❌ FAILED! The script received a '400 Bad Request' from Reddit's server."
+        )
+        print("   This means authentication worked, but the data sent was invalid.")
+        print("\n--- SERVER ERROR MESSAGE ---")
+        # The e.response.text attribute contains the detailed error from Reddit.
+        print(e.response.text)
+        print("--------------------------")
+        sys.exit(1)
+
     except prawcore.exceptions.PrawcoreException as e:
-        print(f"\n❌ FAILED! An error occurred during the PRAW request: {e}")
+        print(f"\n❌ FAILED! A non-400 PRAW error occurred: {e}")
         sys.exit(1)
 
 
@@ -77,8 +91,8 @@ def set_monday_status(reddit):
             "input": {
                 "subredditId": SUBREDDIT_ID,
                 "emojiId": "megablunder",
-                # THE FIX: Pass the dictionary directly. Do not use json.dumps().
-                "description": {"richText": rich_text},
+                # Reverted to using json.dumps(), as this was the original working format.
+                "description": {"richText": json.dumps(rich_text)},
             }
         },
     }
@@ -112,8 +126,8 @@ def set_saturday_status(reddit):
             "input": {
                 "subredditId": SUBREDDIT_ID,
                 "emojiId": "superbrilliant",
-                # THE FIX: Pass the dictionary directly. Do not use json.dumps().
-                "description": {"richText": rich_text},
+                # Reverted to using json.dumps().
+                "description": {"richText": json.dumps(rich_text)},
             }
         },
     }
@@ -129,6 +143,7 @@ def clear_status(reddit):
     update_community_status(reddit, payload, "CLEAR community status")
 
 
+# --- Main Execution Block (unchanged) ---
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python manage_status.py [set-monday|set-saturday|clear]")
