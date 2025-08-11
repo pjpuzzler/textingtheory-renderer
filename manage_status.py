@@ -165,25 +165,25 @@ if __name__ == "__main__":
         print("Usage: python manage_status.py [set-monday|set-saturday|clear]")
         sys.exit(1)
 
-    action = sys.argv[1].lower()
-    print(f"Action triggered: '{action}'")
+    # action = sys.argv[1].lower()
+    # print(f"Action triggered: '{action}'")
 
-    try:
-        if action == "set-monday":
-            set_monday_status()
-        elif action == "set-saturday":
-            set_saturday_status()
-        elif action == "clear":
-            clear_status()
-        else:
-            print(f"Error: Unknown action '{action}'.")
-            sys.exit(1)
-    except Exception as e:
-        print(f"\n❌ A critical error occurred in the main execution block: {e}")
-        print(
-            "   Check the debug screenshot in the GitHub Actions artifacts for details."
-        )
-        sys.exit(1)
+    # try:
+    #     if action == "set-monday":
+    #         set_monday_status()
+    #     elif action == "set-saturday":
+    #         set_saturday_status()
+    #     elif action == "clear":
+    #         clear_status()
+    #     else:
+    #         print(f"Error: Unknown action '{action}'.")
+    #         sys.exit(1)
+    # except Exception as e:
+    #     print(f"\n❌ A critical error occurred in the main execution block: {e}")
+    #     print(
+    #         "   Check the debug screenshot in the GitHub Actions artifacts for details."
+    #     )
+    #     sys.exit(1)
 
 
 # # --- Action-specific Functions (Unchanged) ---
