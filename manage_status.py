@@ -3,7 +3,7 @@ import sys
 import json
 import praw
 import prawcore
-import requests  # Use the reliable requests library for the API call
+import requests
 
 # --- Configuration ---
 SUBREDDIT_ID = "t5_4kth6i"
@@ -18,6 +18,7 @@ def get_reddit_instance():
     if not refresh_token:
         raise ValueError("Missing REDDIT_REFRESH_TOKEN in environment variables.")
 
+    # A token with 'identity' and 'modconfig' scopes is required for this script.
     reddit = praw.Reddit(
         client_id=os.getenv("REDDIT_CLIENT_ID"),
         client_secret=os.getenv("REDDIT_SECRET"),
@@ -32,33 +33,36 @@ def get_reddit_instance():
 def update_community_status(reddit, payload, action_description):
     """
     Uses PRAW to get an access token, then sends the request manually
-    using the 'requests' library for maximum reliability.
+    using the 'requests' library, adding the token as a dummy CSRF.
     """
     print(f"Sending request to {action_description}...")
     try:
-        # Step 1: Force PRAW to authenticate and fetch an access token.
-        # This is the "prime the pump" step. It requires the 'identity' scope.
+        # Step 1: Prime authentication by making a simple call.
         print("Priming authentication to fetch access token...")
-        user = reddit.user.me()
-        print(f"Authentication primed for user: u/{user.name}")
+        reddit.user.me()
+        print("Authentication primed.")
 
-        # Step 2: Now that PRAW has authenticated, the token is guaranteed to exist.
+        # Step 2: Retrieve the access token.
         access_token = reddit._core._authorizer.access_token
         if not access_token:
             raise ValueError("Failed to retrieve access token after priming.")
         print("Successfully retrieved access token.")
 
-        # Step 3: Build the headers for the manual request.
+        # Step 3: Add the access token to the payload under the 'csrf_token' key.
+        # This is the final attempt to satisfy the server's validation.
+        payload_with_csrf = {**payload, "csrf_token": access_token}
+
+        # Step 4: Build the headers.
         headers = {
             "Authorization": f"Bearer {access_token}",
             "User-Agent": USER_AGENT,
             "Content-Type": "application/json",
         }
 
-        # Step 4: Make the API call using 'requests'.
-        print(f"Payload being sent:\n{json.dumps(payload, indent=2)}")
-        response = requests.post(GRAPHQL_URL, headers=headers, json=payload)
-        response.raise_for_status()  # Raise an error for 4xx or 5xx status codes
+        # Step 5: Make the API call using 'requests'.
+        print(f"Final payload being sent:\n{json.dumps(payload_with_csrf, indent=2)}")
+        response = requests.post(GRAPHQL_URL, headers=headers, json=payload_with_csrf)
+        response.raise_for_status()
 
         response_json = response.json()
         if "errors" in response_json and response_json["errors"]:
@@ -67,15 +71,6 @@ def update_community_status(reddit, payload, action_description):
         print(f"Status: SUCCESS\nResponse: {json.dumps(response_json, indent=2)}")
         print(f"\n✅ SUCCESS! {action_description} completed.")
 
-    except prawcore.exceptions.Forbidden as e:
-        print("\n❌ FAILED! A 403 Forbidden error occurred.")
-        print(
-            "   This likely means your refresh token does not have the required 'identity' scope."
-        )
-        print(
-            "   Please generate a new token with both 'modconfig' and 'identity' scopes."
-        )
-        sys.exit(1)
     except requests.RequestException as e:
         print(f"\n❌ FAILED! A network error occurred: {e}")
         if e.response is not None:
@@ -86,7 +81,7 @@ def update_community_status(reddit, payload, action_description):
         sys.exit(1)
 
 
-# --- Action-specific Functions ---
+# --- Action-specific Functions (Unchanged from previous correct version) ---
 def set_monday_status(reddit):
     """Builds and sends the 'Megablunder Monday' status payload."""
     rich_text = {
