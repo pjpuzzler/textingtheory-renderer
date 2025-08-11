@@ -17,6 +17,7 @@ def get_reddit_instance():
     if not refresh_token:
         raise ValueError("Missing REDDIT_REFRESH_TOKEN in environment variables.")
 
+    # We now request the 'identity' scope so we can reliably fetch a CSRF token.
     reddit = praw.Reddit(
         client_id=os.getenv("REDDIT_CLIENT_ID"),
         client_secret=os.getenv("REDDIT_SECRET"),
@@ -29,14 +30,29 @@ def get_reddit_instance():
 
 # --- Helper Function ---
 def update_community_status(reddit, payload, action_description):
-    """Sends the API request using PRAW's authenticated session and provides detailed error reporting."""
-    print(f"Sending request to {action_description} using PRAW's session...")
-
-    # DEBUG: Print the exact payload being sent.
-    print(f"Payload being sent:\n{json.dumps(payload, indent=2)}")
+    """Sends the API request using PRAW's authenticated session."""
+    print(f"Sending request to {action_description}...")
 
     try:
-        response = reddit.post(GRAPHQL_URL, json=payload)
+        # To reliably get a CSRF token, we perform a simple action that requires one.
+        # This forces PRAW to fetch a valid token and store it internally.
+        # Note: Your refresh token must have the "identity" scope for this to work.
+        reddit.user.me()
+
+        # Access the now-guaranteed-to-exist CSRF token from PRAW's requestor.
+        csrf_token = reddit._core._requestor.csrf_token
+
+        if not csrf_token:
+            raise ValueError("Could not retrieve CSRF token after priming.")
+
+        # Add the required csrf_token to the payload, just like the original script.
+        payload_with_csrf = {**payload, "csrf_token": csrf_token}
+
+        # DEBUG: Print the final payload.
+        print(f"Final payload with CSRF:\n{json.dumps(payload_with_csrf, indent=2)}")
+
+        # Use PRAW's post method, which handles the separate access_token header.
+        response = reddit.post(GRAPHQL_URL, json=payload_with_csrf)
 
         if isinstance(response, dict) and "errors" in response and response["errors"]:
             raise prawcore.exceptions.PrawcoreException(
@@ -47,26 +63,19 @@ def update_community_status(reddit, payload, action_description):
         print(f"\n✅ SUCCESS! {action_description} completed.")
 
     except praw.exceptions.RedditAPIException as e:
-        # THIS IS THE CORRECT EXCEPTION TO CATCH
         print("\n❌ FAILED! The script received an API error from Reddit's server.")
-        print("   This means authentication worked, but the data sent was invalid.")
         print("\n--- SERVER ERROR MESSAGE ---")
-        # The detailed error information is here.
-        # We check each part of the exception object to be safe.
         for error in e.items:
             print(f"Error Type: {error.error_type}")
             print(f"Error Message: {error.message}")
-            if hasattr(error, "response"):
-                print(f"Server Response: {error.response.text}")
         print("--------------------------")
         sys.exit(1)
-
-    except prawcore.exceptions.PrawcoreException as e:
-        print(f"\n❌ FAILED! A non-API PRAW error occurred: {e}")
+    except Exception as e:
+        print(f"\n❌ FAILED! A general error occurred: {e}")
         sys.exit(1)
 
 
-# --- Action-specific Functions (Reverted to original json.dumps format for diagnosis) ---
+# --- Action-specific Functions ---
 def set_monday_status(reddit):
     """Builds and sends the 'Megablunder Monday' status payload."""
     rich_text = {
@@ -103,7 +112,6 @@ def set_monday_status(reddit):
 
 def set_saturday_status(reddit):
     """Builds and sends the 'Superbrilliant Saturday' status payload."""
-    # (This function is unchanged but included for completeness)
     rich_text = {
         "document": [
             {
@@ -150,6 +158,13 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python manage_status.py [set-monday|set-saturday|clear]")
         sys.exit(1)
+
+    print("--- IMPORTANT ---")
+    print("This script now requires the 'identity' scope for your refresh token.")
+    print(
+        "If it fails with a 403 Forbidden error, you must generate a new refresh token with both 'modconfig' and 'identity' scopes."
+    )
+    print("-----------------")
 
     try:
         reddit_instance = get_reddit_instance()
