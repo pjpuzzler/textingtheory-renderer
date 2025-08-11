@@ -53,7 +53,9 @@ def update_community_status(payload, action_description):
 
             # Wait for successful login by looking for the user profile icon
             print("Waiting for login to complete...")
-            expect(page.locator("#USER_DROPDOWN_ID")).to_be_visible(timeout=30000)
+            expect(page.locator("#expand-user-drawer-button")).to_be_visible(
+                timeout=15000
+            )
             print("✅ Login successful.")
 
             # --- API Call ---
