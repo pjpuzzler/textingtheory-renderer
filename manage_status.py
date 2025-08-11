@@ -92,7 +92,7 @@ def set_saturday_status():
     """Sets the 'Superbrilliant Saturday' status using full UI automation."""
     print("--- Starting: Set Saturday Status ---")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=False)
         context = browser.new_context()
         page = context.new_page()
         try:
