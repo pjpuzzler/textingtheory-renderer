@@ -3,6 +3,7 @@ import sys
 import json
 import praw
 import requests
+import prawcore
 
 # --- Configuration ---
 SUBREDDIT_ID = "t5_4kth6i"
@@ -19,36 +20,43 @@ def get_reddit_instance():
 
     reddit = praw.Reddit(
         client_id=os.getenv("REDDIT_CLIENT_ID"),
-        client_secret=os.getenv("REDDIT_SECRET"),
+        client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
         user_agent=USER_AGENT,
-        username=os.getenv("REDDIT_USERNAME"),
-        password=os.getenv("REDDIT_PASSWORD"),
+        # No need for username/password when using a refresh token for script auth
         refresh_token=refresh_token,
     )
+    # Validate that authentication is working
+    print(f"Authenticated as u/{reddit.user.me()}")
     return reddit
 
 
 # --- Helper Function ---
 def update_community_status(reddit, payload, action_description):
     """Sends the API request to update the community status."""
-    # PRAW handles authentication, we just need the access token for the header
-    access_token = reddit.auth.scopes() and reddit.auth.token_manager.access_token
-    if not access_token:
-        raise ConnectionError("Failed to get access token from PRAW.")
+    try:
+        # PRAW's public csrf_token property handles fetching a fresh token.
+        # This call also ensures we are authenticated and an access token is available.
+        csrf_token = reddit.auth.csrf_token
 
-    # We need to manually get the csrf_token from the authenticated session
-    csrf_token = reddit.auth.csrf_token
+        # Access the token from the internal authorizer object.
+        access_token = reddit._core._authorizer.access_token
+
+    except prawcore.exceptions.PrawcoreException as e:
+        print(f"\n❌ FAILED! Could not get tokens from PRAW: {e}")
+        sys.exit(1)
 
     headers = {
         "Authorization": f"Bearer {access_token}",
         "user-agent": USER_AGENT,
         "origin": "https://www.reddit.com",
-        "referer": "https://www.reddit.com/r/TextingTheory/",
+        "referer": f"https://www.reddit.com/r/TextingTheory/",
         "content-type": "application/json",
+        # The GraphQL endpoint requires the CSRF token in the headers
         "x-csrf-token": csrf_token,
     }
 
-    # The original payload uses a csrf_token in the body, which we add here
+    # The original GraphQL mutation also expects the csrf_token in the JSON body.
+    # We add it here to the payload passed from the calling function.
     payload_with_csrf = {**payload, "csrf_token": csrf_token}
 
     print(f"Sending request to {action_description}...")
@@ -58,13 +66,13 @@ def update_community_status(reddit, payload, action_description):
         print(f"Status Code: {response.status_code}\nResponse: {response.text}")
         print(f"\n✅ SUCCESS! {action_description} completed.")
     except requests.RequestException as e:
-        print(f"\n❌ FAILED! An error occurred: {e}")
-        if e.response:
+        print(f"\n❌ FAILED! An error occurred during the request: {e}")
+        if e.response is not None:
             print(f"Response content: {e.response.text}")
         sys.exit(1)
 
 
-# --- Action-specific Functions ---
+# --- Action-specific Functions (Unchanged) ---
 def set_monday_status(reddit):
     """Builds and sends the 'Megablunder Monday' status payload."""
     rich_text = {
@@ -149,8 +157,7 @@ if __name__ == "__main__":
 
     try:
         reddit_instance = get_reddit_instance()
-        print("Successfully authenticated with Reddit.")
-    except (ValueError, praw.exceptions.PRAWException) as e:
+    except (ValueError, prawcore.exceptions.PrawcoreException) as e:
         print(f"❌ FAILED to authenticate with Reddit: {e}")
         sys.exit(1)
 
