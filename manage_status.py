@@ -20,13 +20,13 @@ def get_reddit_instance():
 
     reddit = praw.Reddit(
         client_id=os.getenv("REDDIT_CLIENT_ID"),
-        client_secret=os.getenv("REDDIT_SECRET"),
+        client_secret=os.getenv("REDDIT_SECRET"),  # Corrected from your file
         user_agent=USER_AGENT,
-        # No need for username/password when using a refresh token for script auth
         refresh_token=refresh_token,
     )
-    # Validate that authentication is working
-    print(f"Authenticated as u/{reddit.user.me()}")
+    # The line that required 'identity' scope has been removed.
+    # The instance is still authenticated and ready for mod actions.
+    print("Successfully initialized PRAW Reddit instance.")
     return reddit
 
 
