@@ -20,12 +20,10 @@ def get_reddit_instance():
 
     reddit = praw.Reddit(
         client_id=os.getenv("REDDIT_CLIENT_ID"),
-        client_secret=os.getenv("REDDIT_SECRET"),  # Corrected from your file
+        client_secret=os.getenv("REDDIT_SECRET"),
         user_agent=USER_AGENT,
         refresh_token=refresh_token,
     )
-    # The line that required 'identity' scope has been removed.
-    # The instance is still authenticated and ready for mod actions.
     print("Successfully initialized PRAW Reddit instance.")
     return reddit
 
@@ -34,14 +32,15 @@ def get_reddit_instance():
 def update_community_status(reddit, payload, action_description):
     """Sends the API request to update the community status."""
     try:
-        # PRAW's public csrf_token property handles fetching a fresh token.
-        # This call also ensures we are authenticated and an access token is available.
-        csrf_token = reddit.auth.csrf_token
-
-        # Access the token from the internal authorizer object.
+        # THE FIX IS HERE: Get the csrf_token from the core requestor object.
+        # This is the correct internal location for it in modern PRAW.
+        csrf_token = reddit._core._requestor.csrf_token
         access_token = reddit._core._authorizer.access_token
 
-    except prawcore.exceptions.PrawcoreException as e:
+        if not csrf_token or not access_token:
+            raise ValueError("Failed to retrieve valid tokens from PRAW.")
+
+    except (prawcore.exceptions.PrawcoreException, ValueError) as e:
         print(f"\n❌ FAILED! Could not get tokens from PRAW: {e}")
         sys.exit(1)
 
@@ -51,12 +50,10 @@ def update_community_status(reddit, payload, action_description):
         "origin": "https://www.reddit.com",
         "referer": f"https://www.reddit.com/r/TextingTheory/",
         "content-type": "application/json",
-        # The GraphQL endpoint requires the CSRF token in the headers
         "x-csrf-token": csrf_token,
     }
 
-    # The original GraphQL mutation also expects the csrf_token in the JSON body.
-    # We add it here to the payload passed from the calling function.
+    # The GraphQL mutation expects the csrf_token in the JSON body as well.
     payload_with_csrf = {**payload, "csrf_token": csrf_token}
 
     print(f"Sending request to {action_description}...")
