@@ -2,7 +2,6 @@ import os
 import sys
 import json
 import praw
-import requests
 import prawcore
 
 # --- Configuration ---
@@ -23,6 +22,7 @@ def get_reddit_instance():
         client_secret=os.getenv("REDDIT_SECRET"),
         user_agent=USER_AGENT,
         refresh_token=refresh_token,
+        # requestor_kwargs={'session': requests.Session()} # Optional: For advanced proxy/header use
     )
     print("Successfully initialized PRAW Reddit instance.")
     return reddit
@@ -30,46 +30,31 @@ def get_reddit_instance():
 
 # --- Helper Function ---
 def update_community_status(reddit, payload, action_description):
-    """Sends the API request to update the community status."""
+    """Sends the API request using PRAW's authenticated session."""
+    print(f"Sending request to {action_description} using PRAW's session...")
     try:
-        # THE FIX IS HERE: Get the csrf_token from the core requestor object.
-        # This is the correct internal location for it in modern PRAW.
-        csrf_token = reddit._core._requestor.csrf_token
-        access_token = reddit._core._authorizer.access_token
+        # Let PRAW handle the entire request. It will automatically include
+        # the necessary Authorization and x-csrf-token headers.
+        # We pass the payload directly using the `json` parameter.
+        response = reddit.post(GRAPHQL_URL, json=payload)
 
-        if not csrf_token or not access_token:
-            raise ValueError("Failed to retrieve valid tokens from PRAW.")
+        # GraphQL responses don't typically raise HTTP errors for bad
+        # requests, they return a 200 OK with an 'errors' key.
+        if "errors" in response and response["errors"]:
+            raise prawcore.exceptions.PrawcoreException(
+                f"GraphQL returned errors: {response['errors']}"
+            )
 
-    except (prawcore.exceptions.PrawcoreException, ValueError) as e:
-        print(f"\n❌ FAILED! Could not get tokens from PRAW: {e}")
-        sys.exit(1)
-
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "user-agent": USER_AGENT,
-        "origin": "https://www.reddit.com",
-        "referer": f"https://www.reddit.com/r/TextingTheory/",
-        "content-type": "application/json",
-        "x-csrf-token": csrf_token,
-    }
-
-    # The GraphQL mutation expects the csrf_token in the JSON body as well.
-    payload_with_csrf = {**payload, "csrf_token": csrf_token}
-
-    print(f"Sending request to {action_description}...")
-    try:
-        response = requests.post(GRAPHQL_URL, headers=headers, json=payload_with_csrf)
-        response.raise_for_status()
-        print(f"Status Code: {response.status_code}\nResponse: {response.text}")
+        print(f"Status: SUCCESS\nResponse: {response}")
         print(f"\n✅ SUCCESS! {action_description} completed.")
-    except requests.RequestException as e:
-        print(f"\n❌ FAILED! An error occurred during the request: {e}")
-        if e.response is not None:
-            print(f"Response content: {e.response.text}")
+
+    except prawcore.exceptions.PrawcoreException as e:
+        print(f"\n❌ FAILED! An error occurred during the PRAW request: {e}")
         sys.exit(1)
 
 
-# --- Action-specific Functions (Unchanged) ---
+# --- Action-specific Functions ---
+# Note: The 'csrf_token' is no longer needed in these payloads
 def set_monday_status(reddit):
     """Builds and sends the 'Megablunder Monday' status payload."""
     rich_text = {
