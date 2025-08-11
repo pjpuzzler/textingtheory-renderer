@@ -32,7 +32,7 @@ def update_community_status(reddit, payload, action_description):
     """Sends the API request using PRAW's authenticated session and provides detailed error reporting."""
     print(f"Sending request to {action_description} using PRAW's session...")
 
-    # DEBUG: Print the exact payload being sent for review.
+    # DEBUG: Print the exact payload being sent.
     print(f"Payload being sent:\n{json.dumps(payload, indent=2)}")
 
     try:
@@ -46,24 +46,27 @@ def update_community_status(reddit, payload, action_description):
         print(f"Status: SUCCESS\nResponse: {response}")
         print(f"\n✅ SUCCESS! {action_description} completed.")
 
-    except prawcore.exceptions.BadRequest as e:
-        # THIS IS THE CRITICAL DIAGNOSTIC STEP
-        print(
-            "\n❌ FAILED! The script received a '400 Bad Request' from Reddit's server."
-        )
+    except praw.exceptions.RedditAPIException as e:
+        # THIS IS THE CORRECT EXCEPTION TO CATCH
+        print("\n❌ FAILED! The script received an API error from Reddit's server.")
         print("   This means authentication worked, but the data sent was invalid.")
         print("\n--- SERVER ERROR MESSAGE ---")
-        # The e.response.text attribute contains the detailed error from Reddit.
-        print(e.response.text)
+        # The detailed error information is here.
+        # We check each part of the exception object to be safe.
+        for error in e.items:
+            print(f"Error Type: {error.error_type}")
+            print(f"Error Message: {error.message}")
+            if hasattr(error, "response"):
+                print(f"Server Response: {error.response.text}")
         print("--------------------------")
         sys.exit(1)
 
     except prawcore.exceptions.PrawcoreException as e:
-        print(f"\n❌ FAILED! A non-400 PRAW error occurred: {e}")
+        print(f"\n❌ FAILED! A non-API PRAW error occurred: {e}")
         sys.exit(1)
 
 
-# --- Action-specific Functions ---
+# --- Action-specific Functions (Reverted to original json.dumps format for diagnosis) ---
 def set_monday_status(reddit):
     """Builds and sends the 'Megablunder Monday' status payload."""
     rich_text = {
@@ -91,7 +94,6 @@ def set_monday_status(reddit):
             "input": {
                 "subredditId": SUBREDDIT_ID,
                 "emojiId": "megablunder",
-                # Reverted to using json.dumps(), as this was the original working format.
                 "description": {"richText": json.dumps(rich_text)},
             }
         },
@@ -101,6 +103,7 @@ def set_monday_status(reddit):
 
 def set_saturday_status(reddit):
     """Builds and sends the 'Superbrilliant Saturday' status payload."""
+    # (This function is unchanged but included for completeness)
     rich_text = {
         "document": [
             {
@@ -126,7 +129,6 @@ def set_saturday_status(reddit):
             "input": {
                 "subredditId": SUBREDDIT_ID,
                 "emojiId": "superbrilliant",
-                # Reverted to using json.dumps().
                 "description": {"richText": json.dumps(rich_text)},
             }
         },
@@ -143,7 +145,7 @@ def clear_status(reddit):
     update_community_status(reddit, payload, "CLEAR community status")
 
 
-# --- Main Execution Block (unchanged) ---
+# --- Main Execution Block ---
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python manage_status.py [set-monday|set-saturday|clear]")
