@@ -2,51 +2,59 @@ name: Update Reddit Community Status
 
 on:
   schedule:
-    - cron: "0 4 * * 1"
-    - cron: "0 4 * * 2"
-    - cron: "0 4 * * 6"
-    - cron: "0 4 * * 0"
+    - cron: "0 4 * * 1" # Set Monday Status (Monday 00:00 EST)
+    - cron: "0 4 * * 2" # Clear Monday Status (Tuesday 00:00 EST)
+    - cron: "0 4 * * 6" # Set Saturday Status (Saturday 00:00 EST)
+    - cron: "0 4 * * 0" # Clear Saturday Status (Sunday 00:00 EST)
+
   workflow_dispatch:
     inputs:
       action:
-        description: "Action"
+        description: "The action to perform"
         required: true
         type: choice
-        options: [set-monday, set-saturday, clear]
+        options:
+          - set-monday
+          - set-saturday
+          - clear
         default: "clear"
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
+
     env:
-      REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
-      REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
+      REDDIT_COOKIE: ${{ secrets.REDDIT_COOKIE }}
+      REDDIT_CSRF_TOKEN: ${{ secrets.REDDIT_CSRF_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Install Python dependencies
-        run: pip install playwright
+      - name: Install dependencies
+        run: pip install requests
 
-      - name: Install Playwright browsers and dependencies
-        run: playwright install --with-deps chromium
+      - name: Set Monday Status
+        # This step runs if:
+        # 1. The schedule was '0 4 * * 1' OR
+        # 2. The manual input was 'set-monday'
+        if: github.event.schedule == '0 4 * * 1' || github.event.inputs.action == 'set-monday'
+        run: python manage_status.py set-monday
 
-      - name: Run Python Script
-        run: |
-          if [ "${{ github.event.schedule }}" = "0 4 * * 1" ] || [ "${{ github.event.inputs.action }}" = "set-monday" ]; then
-            python manage_status.py set-monday
-          elif [ "${{ github.event.schedule }}" = "0 4 * * 6" ] || [ "${{ github.event.inputs.action }}" = "set-saturday" ]; then
-            python manage_status.py set-saturday
-          elif [ "${{ github.event.schedule }}" = "0 4 * * 2" ] || [ "${{ github.event.schedule }}" = "0 4 * * 0" ] || [ "${{ github.event.inputs.action }}" = "clear" ]; then
-            python manage_status.py clear
-          fi
+      - name: Set Saturday Status
+        if: github.event.schedule == '0 4 * * 6' || github.event.inputs.action == 'set-saturday'
+        run: python manage_status.py set-saturday
 
-      - name: Upload Debug Screenshot on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-screenshot
-          path: debug_screenshot.png
+      - name: Clear Status
+        # This step runs if:
+        # 1. The schedule was for Tuesday OR Sunday OR
+        # 2. The manual input was 'clear'
+        if: >-
+          (github.event.schedule == '0 4 * * 2' || github.event.schedule == '0 4 * * 0') ||
+          github.event.inputs.action == 'clear'
+        run: python manage_status.py clear
