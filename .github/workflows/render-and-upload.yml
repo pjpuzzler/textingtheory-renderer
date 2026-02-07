@@ -32,11 +32,12 @@ jobs:
         env:
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_SECRET: ${{ secrets.REDDIT_SECRET }}
-          ALLTHEPICS_API_KEY: ${{ secrets.ALLTHEPICS_API_KEY }}
           # The payload is now at github.event.client_payload.render_payload
           # We use toJSON() to convert the JSON object to a string for the env var
           RENDER_PAYLOAD_JSON: ${{ toJSON(github.event.client_payload.render_payload) }}
         run: |
+          # Trim whitespace from API key
+          export ALLTHEPICS_API_KEY=$(echo "${{ secrets.ALLTHEPICS_API_KEY }}" | xargs)
           # The command is github.event.action (the event_type from the dispatch)
           # The UID is in the client_payload
           python renderer.py ${{ github.event.action }} ${{ github.event.client_payload.uid }}

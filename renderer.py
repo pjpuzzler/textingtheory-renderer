@@ -683,10 +683,17 @@ def upload_with_api(api_key, file_path, title=None, expiration=None):
                 print(
                     f"Uploading '{os.path.basename(file_path)}' to image host with title '{title}'... (Attempt {attempt})"
                 )
+                print(f"API key length: {len(api_key)} chars, starts with: {api_key[:8]}...")
 
                 response = requests.post(
                     api_url, headers=headers, data=data, files=files
                 )
+
+                # Print response details before raising
+                print(f"Response status: {response.status_code}")
+                if response.status_code != 200:
+                    print(f"Response body: {response.text}")
+
                 response.raise_for_status()
                 json_response = response.json()
 
