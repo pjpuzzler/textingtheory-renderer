@@ -11,6 +11,12 @@ from PIL import Image, ImageDraw, ImageFont, ImageColor
 from pilmoji import Pilmoji
 from pilmoji.source import AppleEmojiSource
 
+try:
+    import cloudscraper
+    USE_CLOUDSCRAPER = True
+except ImportError:
+    USE_CLOUDSCRAPER = False
+
 
 reddit = praw.Reddit(
     client_id=os.environ["REDDIT_CLIENT_ID"],
@@ -667,13 +673,19 @@ def upload_with_api(api_key, file_path, title=None, expiration=None):
         return None
 
     api_url = "https://allthepics.net/api/1/upload"
-    headers = {"X-API-Key": api_key}
+    headers = {
+        "X-API-Key": api_key,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
 
     data = {}
     if title:
         data["title"] = title
     if expiration:
         data["expiration"] = expiration
+
+    # Use cloudscraper if available to bypass Cloudflare
+    session = cloudscraper.create_scraper() if USE_CLOUDSCRAPER else requests.Session()
 
     max_retries = 3
     for attempt in range(1, max_retries + 1):
@@ -683,9 +695,10 @@ def upload_with_api(api_key, file_path, title=None, expiration=None):
                 print(
                     f"Uploading '{os.path.basename(file_path)}' to image host with title '{title}'... (Attempt {attempt})"
                 )
+                print(f"Using {'cloudscraper' if USE_CLOUDSCRAPER else 'requests'}")
                 print(f"API key length: {len(api_key)} chars, starts with: {api_key[:8]}...")
 
-                response = requests.post(
+                response = session.post(
                     api_url, headers=headers, data=data, files=files
                 )
 
