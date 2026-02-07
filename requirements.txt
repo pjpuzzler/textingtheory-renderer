@@ -1,5 +1,5 @@
 requests
 Pillow
-pilmoji
+pilmoji==2.0.3
 emoji==1.6.3
 praw
